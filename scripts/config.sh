@@ -38,7 +38,7 @@ kaba_load_config() {
   local root cfg
   root="$(kaba_repo_root)" || exit 1
   cfg="$root/.kaba/config.yml"
-  [ -f "$cfg" ] || kaba_die "$cfg not found — run /kaba.init"
+  [ -f "$cfg" ] || kaba_die "$cfg not found — run /kaba:init"
 
   KABA_TEST_DIR="$(_kaba_yaml_scalar test_dir "$cfg")"
   KABA_TEST_COMMAND="$(_kaba_yaml_scalar test_command "$cfg")"

@@ -6,7 +6,7 @@ set -euo pipefail
 SCRIPT_DIR="$(CDPATH="" cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # Not a kaba project — stay out of the way. The plugin's hook fires wherever the
-# plugin is enabled, including repos that never ran /kaba.init.
+# plugin is enabled, including repos that never ran /kaba:init.
 root="$(git rev-parse --show-toplevel 2>/dev/null)" || exit 0
 [ -f "$root/.kaba/config.yml" ] || exit 0
 
