@@ -1,0 +1,17 @@
+{
+  "description": "kaba session-lock guard — real-time feedback that blocks Write/Edit/NotebookEdit calls to paths the active session mode (test or implement) denies. Fails open when the project has no .kaba/config.yml.",
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Write|Edit|NotebookEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"${CLAUDE_PLUGIN_ROOT}\"/scripts/session-lock-guard.sh",
+            "timeout": 30
+          }
+        ]
+      }
+    ]
+  }
+}

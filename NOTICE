@@ -1,0 +1,7 @@
+kaba includes portions of GitHub spec-kit (https://github.com/github/spec-kit),
+licensed under the MIT License.
+
+Copyright (c) GitHub, Inc.
+
+Vendored portions: the initial versions of commands/specify.md and
+commands/clarify.md, since diverged.
