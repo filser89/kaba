@@ -4,14 +4,13 @@
 
 - **v1.0 — shipped.** What exists today: a Claude Code plugin for exactly one stack
   (Rails/RSpec), validated end-to-end by the acceptance run on markly (feature
-  006-bookmark-favorites, 2026-08-15). One harness, one stack, on purpose (design D1).
+  006-bookmark-favorites, 2026-08-15). One harness, one stack, on purpose.
 - **v1.1 — hardening.** Fix what the acceptance run and platform review surfaced. Same
   scope as v1.0: no new harnesses, no new stacks — just making v1 solid. The backlog is
   below; the defect details live in `acceptance-findings.md`.
 - **v2 — the adapter era.** A second harness (Codex) and/or a second stack, with the repo
   restructure that separation requires. Trigger: a second *real* consumer, not before —
-  designing adapters against exactly one known consumer produces the wrong abstraction
-  (design D1).
+  designing adapters against exactly one known consumer produces the wrong abstraction.
 
 ## v1.1 backlog
 
@@ -38,7 +37,9 @@
    13 files twice):
    - Add `disable-model-invocation: true` to all thirteen. The pipeline is a chain of human
      gates, and `implement-tests`/`implement-code` arm and clear the session lock — a model
-     that fires one on its own can disarm the two-session boundary.
+     that fires one on its own can disarm the two-session boundary. The flag also drops all
+     13 descriptions from model context (spike-verified; see `manifest-findings.md`), in
+     every project the plugin is enabled in.
    - **Delete the nine `handoffs:` blocks and add prose next-step pointers.** There is no
      handoffs carryover to verify: the key is a VS Code custom-agents feature, inert in
      Claude Code, inherited from spec-kit's multi-target templates (`manifest-findings.md`).
@@ -56,7 +57,7 @@
      path exists — everything routing through `$(git config kaba.scriptdir)` is precisely
      what makes moving the files safe.
    - `NOTICE` names `commands/specify.md` and `commands/clarify.md`; retarget it.
-3. **Release hygiene** (Task 13 deferred minors): README overstates jq as required by every
+3. **Release hygiene** (deferred minors from the extraction): README overstates jq as required by every
    script (4 of 11 use it; the guard fails open without it); scripts/ruby needs its
    ruby 3.3+/Prism install caveat surfaced at install time.
 
@@ -64,10 +65,10 @@
 
 ### Why there is no `adapters/` directory yet
 
-The approved design (§5) keeps the repo flat and puts portability in the *content*, not
+The design keeps the repo flat and puts portability in the *content*, not
 the directory tree: across all 2,158 lines of command text there are only three
 non-portable reference classes, and `session-lock.sh` — where every enforcement rule
-lives — needs zero changes for Codex (design A.8). Pre-building the adapter seam against
+lives — needs zero changes for Codex (see the port facts below). Pre-building the adapter seam against
 one consumer would mean guessing where it goes.
 
 **Correction (2026-08-17):** this section used to add a structural argument — that the
@@ -79,7 +80,7 @@ the plugin root, and `hooks` may point elsewhere or be inlined. Only `plugin.jso
 must sit at `.claude-plugin/`. Component directories are therefore relocatable today, and
 the marketplace entry can point at a subdirectory regardless. What remains — and it is
 enough on its own — is that designing an adapter seam against exactly one known consumer
-produces the wrong abstraction (design D1).
+produces the wrong abstraction.
 
 ### The Claude-specific inventory (what a claude adapter would encapsulate)
 
@@ -94,7 +95,7 @@ produces the wrong abstraction (design D1).
 Everything else — all of `session-lock.sh`, the remaining scripts, all templates, the
 command bodies — is harness-neutral.
 
-### Codex port facts (design A.8, verified 2026-08)
+### Codex port facts (verified 2026-08)
 
 - PreToolUse-equivalent hooks: supported; block convention identical (exit 2 + stderr,
   or `permissionDecision: "deny"` JSON)

@@ -1,8 +1,8 @@
 # Plugin manifest & hook self-registration — verified findings
 
-Produced by Task 1 (gate spike) of the kaba extraction, 2026-08-13.
+Produced by the gate spike during the kaba extraction, 2026-08-13.
 Every claim below is backed by a fetched doc passage or a command run on this machine.
-Tasks 8 and 13 should read this file rather than re-deriving it.
+Read this file rather than re-deriving any of it.
 
 **How to read this doc — two evidence tiers, and they are labeled.** *Spike-observed* means a command
 was run on this machine and its output is reproduced here; build on those directly. *Doc-only* means
@@ -242,7 +242,7 @@ Secondary observations:
   `skills/pingskill/SKILL.md` to the same spike produced
   `- kaba-spike:pingskill: Spike skill — proves skills/ layout naming`. So `skills/init/SKILL.md`
   would also give `/kaba:init`. The docs describe `commands/` as *"Skills as flat Markdown files. Use
-  `skills/` for new plugins"* — **flagged for Task 8**: `commands/` works today (verified) but is the
+  `skills/` for new plugins"* — **flagged for the layout decision**: `commands/` works today (verified) but is the
   older layout, and the manifest's `commands` field *replaces* the default scan while `skills` *adds*
   to it. Either layout satisfies the naming rule above.
 
@@ -314,7 +314,7 @@ The hook then fired in A and **not** in B:
 - A: `spike-guard: blocked /private/tmp/kaba-test-a/SPIKE_BLOCKED.txt`, file not created.
 - B: `Done — SPIKE_BLOCKED.txt was created … the write was not blocked.` (`-rw-r--r-- … 6 bytes`).
 
-> ### Consequence for Task 6 — the fail-open guard is mandatory, not defensive polish
+> ### Consequence for the PreToolUse guard — failing open is mandatory, not defensive polish
 >
 > `claude plugin install` defaults to **`--scope user`** (`-s, --scope <scope>  Installation scope:
 > user, project, or local (default: "user")`). The realistic install is therefore user-global, and a
@@ -329,7 +329,7 @@ The hook then fired in A and **not** in B:
 
 ---
 
-## Install & distribution mechanics (for Tasks 8 and 13)
+## Install & distribution mechanics
 
 ### Local development — no install needed
 
@@ -402,11 +402,11 @@ ships must live inside the plugin directory.
 1. **Namespacing is the whole answer to (c)** and it bites: `kaba.init.md` really would become
    `/kaba:kaba.init`. Renaming to `init.md` is required, not cosmetic.
 2. **Install defaults to user scope**, which makes the user-global hook blast radius the *default*
-   experience, not an edge case. This is the single most important input to Task 6.
+   experience, not an edge case. This is the single most important input to the guard's design.
 3. **A dot in a command filename is fine** — `kaba.ping.md` registered cleanly as `kaba.ping`. The
    problem is purely the visual stutter against the plugin prefix.
 4. **`commands/` is described as the older layout** ("Use `skills/` for new plugins") even though it
-   works. Task 8 should make a deliberate choice; naming behaviour is identical either way.
+   works. The layout choice should be deliberate; naming behaviour is identical either way.
 5. **`commands/` subdirectories are not scanned** — kaba's command files must be flat.
 6. `claude plugin validate` **warns** on a missing `author`. Ship one; `--strict` promotes it to an
    error and the community-marketplace pipeline runs the same check.
@@ -446,10 +446,40 @@ kaba ships only `commands/` yet its thirteen register as skills.
 > migration has to justify itself on the legacy-layout argument and on the skill-only frontmatter keys
 > (`when_to_use`, `paths`, `hooks`, `context: inline|fork`, `agent`, `background`) instead.
 
-**Not verified:** whether the flag also removes the description from model context. The documentation
-describes invocation blocking only, and the binary carries a refusal string
-(*"cannot be used with Skill tool due to disable-model-invocation"*) implying the model still sees the
-skill and is refused at call time. Do not repeat the context-saving claim without testing it.
+**It also removes the description from model context — spike-observed 2026-08-17.** The documentation
+describes invocation blocking only, so this was tested directly. Throwaway plugin `dmi-spike` with two
+skills, identical but for the flag, each description carrying a distinct invented word:
+
+| Skill | `disable-model-invocation` | Description contains |
+|---|---|---|
+| `alpha-open` | absent (default `false`) | `ZORPTANGLE` |
+| `beta-locked` | `true` | `QUIXFRAMBLE` |
+
+```
+$ claude -p "…report EXACTLY which of those two words you can see in your available-skills list…" \
+    --plugin-dir /tmp/dmi-spike
+ZORPTANGLE=yes QUIXFRAMBLE=no
+```
+
+**Negative control — the locked skill is loaded, not broken.** Both still run when the *user* types
+the slash command, which is what proves the `no` above is the flag hiding it rather than a skill that
+failed to load:
+
+```
+$ claude -p "/dmi-spike:beta-locked" --plugin-dir /tmp/dmi-spike
+BETA
+$ claude -p "/dmi-spike:alpha-open"  --plugin-dir /tmp/dmi-spike
+ALPHA
+```
+
+So the flag does both things: the model cannot invoke the skill, **and** does not carry its
+description. For kaba that is 13 descriptions out of context in every project the plugin is enabled
+in — and since install defaults to `--scope user`, that means every project on the machine, including
+ones that have never run `/kaba:init`.
+
+The binary's refusal string (*"cannot be used with `Skill` tool due to disable-model-invocation"*)
+is not evidence against this; it is the path for a model that names the skill some other way — from a
+CLAUDE.md mention, or the user quoting it — rather than from the listing.
 
 ### `handoffs:` is a VS Code key and does nothing in Claude Code
 

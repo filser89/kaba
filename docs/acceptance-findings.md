@@ -1,4 +1,4 @@
-# Acceptance Findings — Task 15 end-to-end run
+# Acceptance Findings — the end-to-end run
 
 Defects and manual workarounds observed while running the `/kaba:` pipeline on markly
 (feature `006-bookmark-favorites-a-boolean`). Anything listed here is a kaba defect, not a

@@ -22,7 +22,7 @@ assert_stdout_match "sets kaba.scriptdir"      'scripts'       git -C "$r1" conf
 assert_ok           "installs an executable shim" test -x "$r1/.kaba/hooks/pre-commit"
 assert_stdout_match "gitignores runner artifact" 'examples.txt' cat "$r1/.gitignore"
 
-# The written config must load cleanly through the Task 3 loader — the two must agree.
+# The written config must load cleanly through scripts/config.sh — the two must agree.
 assert_ok "written config round-trips through the loader" \
   bash -c "cd '$r1' && . '$SCRIPT_DIR/../scripts/config.sh' && kaba_load_config"
 
