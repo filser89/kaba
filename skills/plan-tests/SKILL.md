@@ -1,5 +1,6 @@
 ---
 name: plan-tests
+disable-model-invocation: true
 description: Translate acceptance criteria into a concrete test plan — file locations, factory needs, shared contexts, and criterion-to-file mapping. No test code.
 handoffs:
   - label: Implement Tests

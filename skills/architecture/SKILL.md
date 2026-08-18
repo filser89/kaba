@@ -1,5 +1,6 @@
 ---
 name: architecture
+disable-model-invocation: true
 description: Full codebase scan that creates or rebuilds the project architecture document at .kaba/architecture.md. Human-triggered (project setup, or when the doc is suspected stale).
 handoffs:
   - label: Build Specification

@@ -1,5 +1,6 @@
 ---
 name: clarify
+disable-model-invocation: true
 description: Identify underspecified areas and unconfirmed assumptions in the current feature
   spec by asking up to 5 highly targeted clarification questions, then encode every answer back
   into spec.md.

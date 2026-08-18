@@ -1,5 +1,6 @@
 ---
 name: init
+disable-model-invocation: true
 description: Onboard this project onto kaba — detect the stack, confirm with the user, then write .kaba/config.yml and wire the enforcement hooks.
 ---
 

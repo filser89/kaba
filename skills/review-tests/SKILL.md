@@ -1,5 +1,6 @@
 ---
 name: review-tests
+disable-model-invocation: true
 description: Review the test suite for strength before implementation — could a terrible implementation pass these tests? Read-only; writes a severity-graded findings report.
 ---
 

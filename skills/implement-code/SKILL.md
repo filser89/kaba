@@ -1,5 +1,6 @@
 ---
 name: implement-code
+disable-model-invocation: true
 description: Write implementation code to make the locked test suite green, following code-plan.md. Only implementation files — never test files.
 handoffs:
   - label: Architecture Diff

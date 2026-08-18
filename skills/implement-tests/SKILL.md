@@ -1,5 +1,6 @@
 ---
 name: implement-tests
+disable-model-invocation: true
 description: Write all test code following the test plan. Only test files — no implementation code.
 handoffs:
   - label: Review Tests

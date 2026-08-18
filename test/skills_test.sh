@@ -32,6 +32,12 @@ for name in $EXPECTED; do
   assert_ok "$name declares name: matching its directory" \
     grep -qx "name: $name" "$f"
 
+  # The pipeline is a chain of human gates, and implement-tests/implement-code arm and
+  # clear the session lock — a model that fires one on its own can disarm the two-session
+  # boundary. Asserted against the frontmatter block only: the key is inert in prose.
+  assert_stdout_match "$name blocks model invocation" '^disable-model-invocation: true$' \
+    awk 'NR>1 && /^---$/{exit} NR>1{print}' "$f"
+
   # Every template read must route through the pinned script dir. A file-relative
   # ../templates would resolve against the skill directory and break the moment the
   # layout moves again — which is exactly what this migration just did.

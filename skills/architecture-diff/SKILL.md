@@ -1,5 +1,6 @@
 ---
 name: architecture-diff
+disable-model-invocation: true
 description: Fold the just-completed feature's architectural delta into .kaba/architecture.md. Mandatory at the end of every feature.
 handoffs:
   - label: Build Specification
