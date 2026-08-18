@@ -1,6 +1,18 @@
 {
-  "description": "kaba session-lock guard — real-time feedback that blocks Write/Edit/NotebookEdit calls to paths the active session mode (test or implement) denies. Fails open when the project has no .kaba/config.yml.",
+  "description": "kaba hooks — a session-lock guard that blocks Write/Edit/NotebookEdit calls to paths the active session mode (test or implement) denies, and a SessionStart rewire that keeps kaba.scriptdir pointed at the running plugin version. Both fail open when the project has no .kaba/config.yml.",
   "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"${CLAUDE_PLUGIN_ROOT}\"/scripts/session-start-rewire.sh",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
     "PreToolUse": [
       {
         "matcher": "Write|Edit|NotebookEdit",
