@@ -27,6 +27,22 @@ down to empty next.
 
 ## Outline
 
+0. **Prior-run gate — before scaffolding anything.** Run
+   `$(git config kaba.scriptdir)/check-artifacts.sh specify` from the repo root and read its
+   `KEY=value` lines. This command never overwrites a file; its hazard is different. `new-feature.sh`
+   allocates the **next** number and branches off whatever is currently checked out, so an accidental
+   re-run silently creates a stray feature hanging off the current one. The gate therefore keys on
+   whether a feature resolved at all, not on whether `spec.md` exists.
+   - `PRIOR_RUN=unknown` with `REASON=no-feature-branch` — this is the normal fresh start. Proceed.
+   - `PRIOR_RUN=yes` — you are already on a feature branch. STOP and ask, using `FEATURE_DIR` and
+     `MISSING` to say which case it is: if `MISSING=spec.md`, a previous `/kaba:specify` did not
+     finish — offer to resume it by writing the spec into the existing directory instead of
+     scaffolding a new one. Otherwise the feature is complete, and continuing will create a **new**
+     numbered feature branched off this one. Ask which they want, then **end your turn** — do not
+     answer yourself and do not proceed in the same response. Use `AskUserQuestion` if available.
+   - A non-zero exit, or no `PRIOR_RUN=` line at all — STOP and report the script's stderr verbatim.
+     **Absence of an answer is never "no."**
+
 1. **Determine mode**: if `$ARGUMENTS` starts with `--spec `, this is **import mode** and the rest
    of the argument is the source document's path; otherwise this is **author mode** and the whole
    argument is the one-liner. In import mode, if the path does not exist, ERROR and stop.

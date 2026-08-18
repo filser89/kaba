@@ -19,6 +19,11 @@ You **MUST** consider the user input before proceeding (if not empty). The user 
 
 1. Run `$(git config kaba.scriptdir)/resolve-feature.sh` from repo root. It prints three `KEY=value` lines — `REPO_ROOT`, `FEATURE_DIR`, `FEATURE_SPEC` — read them line-by-line (never `eval`; a path may contain spaces). For single quotes in args like "I'm Groot", use escape syntax: e.g 'I'\''m Groot' (or double-quote if possible: "I'm Groot").
 
+   - **Prior-run gate — resolve this BEFORE reading anything or arming the lock.** Step 3 changes repo state and runs the whole suite, so the gate has to come first. Run `$(git config kaba.scriptdir)/check-artifacts.sh implement-tests` from the repo root and read its `KEY=value` lines:
+     - `PRIOR_RUN=yes` — STOP and ask the user: "`snapshots/post-test.json` already exists for this feature — a prior `/kaba:implement-tests` run completed and captured its post-test snapshot. Re-running rewrites the test session's work. Continue? The previous snapshot is not recoverable (feature artifacts are untracked at this stage)." Ask, then **end your turn** — do not answer yourself and do not proceed in the same response. Use `AskUserQuestion` if it is available. Continue only on an explicit yes.
+     - `PRIOR_RUN=no` — proceed. This is the normal case for both a fresh start **and** a resume: the gate keys on `post-test.json`, which only exists after a completed run, never on `baseline.json`, which is present mid-session by design. The resume path in step 3 is unaffected.
+     - `PRIOR_RUN=unknown`, a non-zero exit, or no `PRIOR_RUN=` line at all — STOP and report the script's stderr verbatim. **Absence of an answer is never "no."**
+
 2. **Load context**:
    - **REQUIRED**: Read `FEATURE_DIR/test-plan.md` — the structural contract (files, describe blocks, criteria mapping, factories, helpers). If missing, ERROR and stop — suggest running `/kaba:plan-tests` first.
    - **REQUIRED**: Read `FEATURE_DIR/acceptance-criteria.md` — the behavioral contract (what each criterion asserts). If missing, ERROR and stop.

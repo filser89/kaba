@@ -25,7 +25,11 @@ This is a **planning step**, not a writing step. No test code is produced. The o
 
 ## Outline
 
-1. **Resolve feature paths**: Run `$(git config kaba.scriptdir)/resolve-feature.sh` from the repo root. It prints three `KEY=value` lines — `REPO_ROOT`, `FEATURE_DIR`, `FEATURE_SPEC` — read them line-by-line (never `eval`; a path may contain spaces).
+1. **Resolve feature paths, then check for a prior run**: Run `$(git config kaba.scriptdir)/resolve-feature.sh` from the repo root. It prints three `KEY=value` lines — `REPO_ROOT`, `FEATURE_DIR`, `FEATURE_SPEC` — read them line-by-line (never `eval`; a path may contain spaces).
+   - **Prior-run gate — resolve this BEFORE reading any file.** A re-run regenerates the plan from scratch, so the gate must come before any analysis spends tokens, not merely before the write. Run `$(git config kaba.scriptdir)/check-artifacts.sh plan-tests` from the repo root and read its `KEY=value` lines:
+     - `PRIOR_RUN=yes` — STOP and ask the user, naming what `EXISTING` lists (and mentioning `EMPTY` or `MISSING` if either is non-empty, since those mean the previous run crashed part-way): "`test-plan.md` and `test-plan.json` already exist for this feature — a prior run of `/kaba:plan-tests` completed. Overwrite? The previous version is not recoverable (feature artifacts are untracked at this stage), and a re-run is a fresh derivation, not a reproduction." Ask, then **end your turn** — do not answer yourself and do not proceed in the same response. Use `AskUserQuestion` if it is available. Continue only on an explicit yes.
+     - `PRIOR_RUN=no` — proceed.
+     - `PRIOR_RUN=unknown`, a non-zero exit, or no `PRIOR_RUN=` line at all — STOP and report the script's stderr verbatim. **Absence of an answer is never "no."**
    - Read the acceptance criteria from `FEATURE_DIR/acceptance-criteria.md`. If it does not exist, ERROR and stop.
    - Read the spec from `FEATURE_SPEC` (i.e. `FEATURE_DIR/spec.md`). If it does not exist, ERROR and stop.
 
@@ -129,6 +133,8 @@ Do NOT prescribe how the human should resolve it. The human may answer inline, d
 ### Amendment re-runs
 
 A re-run may carry an `## ESCALATION — test-plan defect` block from `implement-tests` or `fix-tests` as input. Treat it as scope: re-scan identities (step 4), re-run the invalidation sweep (step 9) for any contract delta the escalation touches, amend the affected plan sections and the Planned State Changes table, re-validate, and regenerate `test-plan.json` whole. Do not restructure parts of the plan the escalation does not touch.
+
+An amendment re-run still passes through step 1's prior-run gate — the plan files exist, so it will ask. That is expected, not an error state: the amendment regenerates `test-plan.json` whole, so the previous version really is being destroyed. Answer the gate, mention the escalation as the reason, and continue.
 
 ## Criteria-to-File Mapping Rules
 

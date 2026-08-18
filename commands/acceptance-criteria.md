@@ -18,7 +18,12 @@ This is a **thinking step**, not a writing step. No test code is produced. No im
 
 ## Outline
 
-1. **Resolve feature paths**: Run `$(git config kaba.scriptdir)/resolve-feature.sh` from the repo root. It prints three `KEY=value` lines — `REPO_ROOT`, `FEATURE_DIR`, `FEATURE_SPEC` — read them line-by-line (never `eval`; a path may contain spaces). Read the spec from `FEATURE_SPEC` (i.e. `FEATURE_DIR/spec.md`). If no spec exists, ERROR and stop.
+1. **Resolve feature paths, then check for a prior run**: Run `$(git config kaba.scriptdir)/resolve-feature.sh` from the repo root. It prints three `KEY=value` lines — `REPO_ROOT`, `FEATURE_DIR`, `FEATURE_SPEC` — read them line-by-line (never `eval`; a path may contain spaces).
+   - **Prior-run gate — resolve this BEFORE reading the spec.** A re-run regenerates the criteria from scratch, so the gate must come before any analysis spends tokens, not merely before the write. Run `$(git config kaba.scriptdir)/check-artifacts.sh acceptance-criteria` from the repo root and read its `KEY=value` lines:
+     - `PRIOR_RUN=yes` — STOP and ask the user, naming what `EXISTING` lists (and mentioning `EMPTY` if non-empty, which means the previous run crashed part-way): "`acceptance-criteria.md` already exists for this feature — a prior run of `/kaba:acceptance-criteria` completed. Overwrite? The previous version is not recoverable (feature artifacts are untracked at this stage), and a re-run is a fresh derivation, not a reproduction." Ask, then **end your turn** — do not answer yourself and do not proceed in the same response. Use `AskUserQuestion` if it is available. Continue only on an explicit yes.
+     - `PRIOR_RUN=no` — proceed.
+     - `PRIOR_RUN=unknown`, a non-zero exit, or no `PRIOR_RUN=` line at all — STOP and report the script's stderr verbatim. **Absence of an answer is never "no."**
+   - Only then read the spec from `FEATURE_SPEC` (i.e. `FEATURE_DIR/spec.md`). If no spec exists, ERROR and stop.
 
 2. **Load context**:
    - Read the project rules (CLAUDE.md/AGENTS.md, per `.kaba/config.yml`'s `rules_files`) for project-wide constraints.

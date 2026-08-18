@@ -17,7 +17,11 @@ You **MUST** consider the user input before proceeding (if not empty). The user 
 
 ## Outline
 
-1. **Resolve feature paths**: Run `$(git config kaba.scriptdir)/resolve-feature.sh` from the repo root. It prints three `KEY=value` lines — `REPO_ROOT`, `FEATURE_DIR`, `FEATURE_SPEC` — read them line-by-line (never `eval`; a path may contain spaces).
+1. **Resolve feature paths, then check for a prior run**: Run `$(git config kaba.scriptdir)/resolve-feature.sh` from the repo root. It prints three `KEY=value` lines — `REPO_ROOT`, `FEATURE_DIR`, `FEATURE_SPEC` — read them line-by-line (never `eval`; a path may contain spaces).
+   - **Prior-run gate — resolve this BEFORE reading anything or arming the lock.** Step 2 changes repo state, so the gate has to come first. Run `$(git config kaba.scriptdir)/check-artifacts.sh implement-code` from the repo root and read its `KEY=value` lines:
+     - `PRIOR_RUN=yes` — STOP and ask the user: "`snapshots/post-impl.json` already exists for this feature — a prior `/kaba:implement-code` run completed and passed its end gates. Re-running rewrites the implementation session's work. Continue? The previous snapshot is not recoverable (feature artifacts are untracked at this stage)." Ask, then **end your turn** — do not answer yourself and do not proceed in the same response. Use `AskUserQuestion` if it is available. Continue only on an explicit yes.
+     - `PRIOR_RUN=no` — proceed. This is the normal case for both a fresh start and the idempotent re-run described in Key Rule 2: `post-impl.json` is written only after all end gates pass, so a session that stopped short leaves the gate open.
+     - `PRIOR_RUN=unknown`, a non-zero exit, or no `PRIOR_RUN=` line at all — STOP and report the script's stderr verbatim. **Absence of an answer is never "no."**
 
 2. **Arm the session lock**: Run `$(git config kaba.scriptdir)/session-lock.sh set implement` from the repo root. This locks the test directory for the duration of the implementation session (enforced by the PreToolUse guard and the pre-commit hook).
 
