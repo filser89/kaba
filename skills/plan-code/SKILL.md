@@ -1,4 +1,5 @@
 ---
+name: plan-code
 description: Turn the locked test suite into an implementation plan — components, schema, decisions, and dependency-ordered build order to make every test green, consistent with existing architecture. No implementation code.
 handoffs:
   - label: Implement Code

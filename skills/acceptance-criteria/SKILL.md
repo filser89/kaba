@@ -1,4 +1,5 @@
 ---
+name: acceptance-criteria
 description: Decompose a feature specification's acceptance scenarios into granular, test-oriented acceptance criteria for the test session.
 ---
 

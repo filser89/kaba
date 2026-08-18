@@ -1,4 +1,5 @@
 ---
+name: research
 description: Investigate a single open question for the current feature given this project's stack, and append a short recommendation to research-log.md for the human to decide on. Human-facing decision support — no other command reads its output.
 handoffs:
   - label: Resume Test Planning

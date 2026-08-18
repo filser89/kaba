@@ -22,12 +22,17 @@ assert_stdout_match "plugin declares an author" '.' jq -r '.author.name // empty
 assert_stdout_match "marketplace declares an owner" '.' jq -r '.owner.name // empty' "$M/marketplace.json"
 
 # Only plugin.json belongs inside .claude-plugin/; components live at the plugin root.
-for d in commands scripts hooks templates; do
+for d in skills scripts hooks templates; do
   assert_fail "$d/ is not inside .claude-plugin" 1 test -d "$M/$d"
   assert_ok   "$d/ is at the plugin root"          test -d "$SCRIPT_DIR/../$d"
 done
 
 # NOTICE names vendored files by path; a rename would leave the attribution dangling.
+# The count is asserted because the failure mode here is silence: an extraction pattern
+# that stops matching checks nothing and still reports green.
+notice_paths=0
 while IFS= read -r rel; do
+  notice_paths=$((notice_paths + 1))
   assert_file_exists "NOTICE path $rel exists" "$SCRIPT_DIR/../$rel"
-done < <(grep -o '[a-z-]*/[a-z-]*\.md' "$SCRIPT_DIR/../NOTICE" | sort -u)
+done < <(grep -oE '[A-Za-z0-9_-]+(/[A-Za-z0-9_-]+)*\.md' "$SCRIPT_DIR/../NOTICE" | sort -u)
+assert_eq "NOTICE still attributes 2 vendored files" "2" "$notice_paths"

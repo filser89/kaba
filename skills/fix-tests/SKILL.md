@@ -1,4 +1,5 @@
 ---
+name: fix-tests
 description: Read test-review findings, apply mechanical fixes to test files, interactively resolve escalated findings, re-validate via snapshot and banned-pattern scan, and write an audit log.
 ---
 
