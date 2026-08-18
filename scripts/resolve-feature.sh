@@ -15,9 +15,14 @@ if [[ "$branch" =~ ^([0-9]{8}-[0-9]{6})- ]]; then
 elif [[ "$branch" =~ ^([0-9]{3})- ]]; then
   prefix="${BASH_REMATCH[1]}"
 else
+  # Exit 3, not 1: "not on a feature branch" is the one benign failure here — it is
+  # the ordinary state before /kaba:specify scaffolds anything. The other two exits
+  # (no matching dir, ambiguous match) are faults. Callers that need to tell them
+  # apart cannot do it from stderr text without breaking on a reworded message.
+  # Every existing consumer tests for non-zero, so 3 is compatible.
   echo "ERROR: not on a feature branch. Current branch: $branch" >&2
   echo "Feature branches are named like 001-feature-name or 20260813-091500-feature-name." >&2
-  exit 1
+  exit 3
 fi
 
 feature_root="$KABA_REPO_ROOT/${KABA_FEATURE_DIR%/}"

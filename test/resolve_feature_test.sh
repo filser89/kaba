@@ -34,11 +34,14 @@ r2="$(make_repo 20260813-091500-hotfix 20260813-091500-hotfix)"
 assert_stdout_match "resolves timestamp branch" 'FEATURE_DIR=.*/20260813-091500-hotfix$' \
   bash -c "cd '$r2' && '$RESOLVE'"
 
+# Exit 3 is the benign "no feature yet" case; 1 is a fault. check-artifacts.sh
+# depends on being able to tell them apart without parsing stderr.
 r3="$(make_repo master 001-first)"
-assert_fail        "non-feature branch exits 1" 1 bash -c "cd '$r3' && '$RESOLVE'"
+assert_fail        "non-feature branch exits 3" 3 bash -c "cd '$r3' && '$RESOLVE'"
 assert_stderr_match "non-feature branch names the branch" 'master' bash -c "cd '$r3' && '$RESOLVE'"
 
 r4="$(make_repo 007-ghost)"
+assert_fail        "no matching dir exits 1" 1 bash -c "cd '$r4' && '$RESOLVE'"
 assert_stderr_match "no matching dir errors" 'no feature directory' bash -c "cd '$r4' && '$RESOLVE'"
 
 r5="$(make_repo 008-dupe 008-dupe-one 008-dupe-two)"
