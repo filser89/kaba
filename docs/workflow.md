@@ -135,6 +135,54 @@ The snapshot script (`$(git config kaba.scriptdir)/snapshot-tests.sh`) is called
 | N+1 query detection (if the suite has it, e.g. Prosopite) | Hook | Rides along inside the `test_command` green run, pass/fail |
 | Test plan criterion coverage | Prompt | Agent follows test plan structure |
 | Code architecture decisions | Prompt | Agent follows implementation plan |
+| Re-run overwrite confirmation | Prompt | `check-artifacts.sh` answers *has this step already completed?*; the command's own step 1 acts on the answer (see **Re-running a step**) |
+
+The overwrite confirmation is the one rule in this table that is prompt-held by necessity rather than
+by choice. Nothing can force the agent to *run* the script, and a `PreToolUse` hook — the mechanism
+used for everything else — fires at write time, which is far too late: the cost being prevented is a
+whole regeneration's worth of analysis, spent before a single byte is written.
+
+### Re-running a step
+
+Feature artifacts under `feature_dir` are untracked until late in the pipeline, so a second run of a
+command that has already completed destroys the first version with no git copy to restore. Six
+commands therefore check before doing anything else, via
+`$(git config kaba.scriptdir)/check-artifacts.sh <command>`:
+
+| Command | What proves a prior run |
+|---|---|
+| `/kaba:specify` | a feature branch resolved at all — see below |
+| `/kaba:acceptance-criteria` | `acceptance-criteria.md` |
+| `/kaba:plan-tests` | `test-plan.md`, `test-plan.json` |
+| `/kaba:plan-code` | `code-plan.md` |
+| `/kaba:implement-tests` | `snapshots/post-test.json` |
+| `/kaba:implement-code` | `snapshots/post-impl.json` |
+
+Three properties are load-bearing and should not be "simplified" later:
+
+- **The gate keys on completion markers, never on in-progress state.** `implement-tests` checks
+  `post-test.json`, *not* `baseline.json` — `baseline.json` exists mid-session by design, and the
+  resume path depends on it (snapshot capture refuses to overwrite a baseline while test work is in
+  progress). Switching the gate to `baseline.json` would make every resume ask, defeating that path.
+- **`specify` gates on branch resolution, not on `spec.md`.** It never overwrites anything;
+  `new-feature.sh` allocates the *next* number and branches off whatever is checked out, so the
+  hazard is a stray feature hanging off the current one. Gating on the file would sail past the
+  ordinary interrupted case — branch and directory created, spec never written.
+- **No answer is not the same as "no."** If the script exits non-zero or prints no `PRIOR_RUN=` line,
+  the command stops. Otherwise a missing or unreachable script — the exact thing a stale
+  `kaba.scriptdir` produces — would read as "no prior run" and sail straight through the gate.
+
+`/kaba:clarify` is the deliberate exception: re-running it is a legitimate way to resolve something
+still unclear, so it does not gate on its output existing. It asks only when the spec has no open
+questions and no unconfirmed decisions left — at which point a re-run has nothing to clarify and would
+only re-derive settled answers. `/kaba:fix-tests` is ungated for the same family of reason: it is the
+NO-GO remediation loop, re-run by design. `/kaba:architecture` and `/kaba:architecture-diff` target
+`.kaba/architecture.md`, which is tracked in git and therefore recoverable — the precise property the
+feature directory lacks.
+
+Answering yes simply proceeds and regenerates. Nothing is archived: a `.bak` file would leave stale
+artifacts in a directory the pipeline reads, and the ask says the previous version is unrecoverable
+because it is.
 
 ### Session Lock
 
@@ -143,6 +191,7 @@ The two-session boundary is enforced by a lock with one state file and one rule 
 - **State**: `.kaba/session-lock` (git-ignored) holds `test` or `implement`; absent = unrestricted. `/kaba:implement-tests` sets `test` at its start; `/kaba:implement-code` sets `implement` at its start and clears the lock after all end gates pass — a completed feature leaves the repo unrestricted, so the lock is armed only between the test session and the end of the implementation session. Manual override: `$(git config kaba.scriptdir)/session-lock.sh status|clear`.
 - **Rules** (complement of `test_dir`, derived from `.kaba/config.yml`, in `session-lock.sh check`): `implement` may write everything **except** `test_dir`; `test` may write **only** `test_dir`, `feature_dir`, and the configured `test_writable` carve-outs. The rule is a complement, not a hand-maintained deny-list of implementation territory — nothing project-specific needs to be kept in sync as the codebase grows.
 - **PreToolUse guard** (`hooks/hooks.json`, self-registered by the plugin — no `settings.json` edit needed): blocks the agent's `Write`/`Edit`/`NotebookEdit` calls to locked paths at the moment of the edit, giving real-time feedback on path-declaring tool calls.
+- **SessionStart rewire** (same file): re-points `kaba.scriptdir` at the plugin copy that is actually running. `/kaba:init` pins that path absolutely, and a marketplace install puts the version in it, so every version bump would otherwise strand it — leaving new command text calling scripts out of the old directory. Fails open in any repo without `.kaba/config.yml`, and never pins at a scripts directory that does not exist.
 - **Pre-commit hook** (`.kaba/hooks/pre-commit`, installed into the consumer repo by `/kaba:init`): validates staged paths at the commit boundary via `core.hooksPath`. (`--no-verify` can bypass — guardrail, not security.)
 
 The **guarantee** is the pair of git-based checks — the pre-commit hook and the implementation session's end gates. They inspect the working tree and the index, so they are indifferent to how a change arrived. The PreToolUse guard is real-time feedback layered on top of them, not a substitute.

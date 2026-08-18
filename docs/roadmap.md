@@ -15,23 +15,50 @@
 
 ## v1.1 backlog
 
-1. **F-1** — artifact-producing commands ask confirmation before overwriting prior-run
-   output (clarify excepted while open questions remain). See `acceptance-findings.md`.
-2. **F-2 + F-3** — test-plan.json allowlist schema v3: `{action, expected_landing}`
+1. **F-2 + F-3** — test-plan.json allowlist schema v3: `{action, expected_landing}`
    entries (MODIFY/REMOVE/PIN/TOUCH), per-example AST digests in snapshots, and
    human-approved fix-tests escalations appending their own allowlist entries. One fix,
    two findings. See `acceptance-findings.md`.
-3. **commands/ → skills/ migration.** Commands were merged into skills platform-side
-   (not deprecated, no urgency). Migrating buys `disable-model-invocation: true` —
-   mechanical user-invoke-only enforcement for the gated pipeline, plus 13 command
-   descriptions removed from model context on every kaba-enabled project. Invocation
-   (`/kaba:<name>`) and `hooks/hooks.json` are unchanged. Verify the `handoffs:`
-   frontmatter carries over on ONE migrated file before doing the other twelve. Folds
-   naturally into F-1's pass over the same 13 files.
-4. **Release hygiene** (Task 13 deferred minors): plugin.json/marketplace.json duplicate
-   version+description — bump both or the update silently no-ops; README overstates jq as
-   required by every script (4 of 11 use it; the guard fails open without it);
-   scripts/ruby needs its ruby 3.3+/Prism install caveat surfaced at install time.
+2. **commands/ → skills/ migration.** Commands were merged into skills platform-side
+   (not deprecated, no urgency). Invocation (`/kaba:<name>`) and `hooks/hooks.json` are
+   unchanged: skills namespace off the *directory* name, so `skills/init/SKILL.md` still
+   gives `/kaba:init`. Verified layout facts are in `manifest-findings.md` — directory per
+   skill, no flat `skills/<name>.md` form, `$ARGUMENTS` works, no manifest change needed
+   since `skills/` is scanned by default.
+
+   **Why, since the original rationale was wrong.** This item used to claim migrating buys
+   `disable-model-invocation: true`. It does not — that key works in `commands/*.md` today
+   (see `manifest-findings.md`). The real arguments are that `commands/` is the legacy
+   layout and that skills support frontmatter keys commands cannot: `when_to_use`, `paths`,
+   `hooks`, `context: inline|fork`, `agent`, `background`. `context: fork` is the concrete
+   lever — `review-tests` is read-only and self-contained, exactly the shape that wants a
+   forked subagent rather than the main conversation.
+
+   **Scope, carried over from the F-1 pass** (deferred there only to avoid touching the same
+   13 files twice):
+   - Add `disable-model-invocation: true` to all thirteen. The pipeline is a chain of human
+     gates, and `implement-tests`/`implement-code` arm and clear the session lock — a model
+     that fires one on its own can disarm the two-session boundary.
+   - **Delete the nine `handoffs:` blocks and add prose next-step pointers.** There is no
+     handoffs carryover to verify: the key is a VS Code custom-agents feature, inert in
+     Claude Code, inherited from spec-kit's multi-target templates (`manifest-findings.md`).
+     Ten of thirteen commands consequently end with no next-step guidance at all — only
+     `specify.md`, `init.md`, and `fix-tests.md` say it in prose. Each pointer should carry
+     the intent of the handoff it replaces, and the three that omitted `send: true`
+     (`architecture`, `architecture-diff`, `research`) meant "the human edits this before it
+     runs" — preserve that by asking for input rather than presenting the step as automatic.
+   - Rewrite `test/commands_test.sh` → `test/skills_test.sh`. Under bash the unmatched glob
+     at its per-file loop stays literal, so the move fails loudly (~20 red assertions), not
+     silently. The risk is in the *fix*: driving the loop from a `skills/*/SKILL.md` glob
+     means a directory missing its `SKILL.md` yields a green suite with that skill
+     unchecked. Drive the matrix from the `EXPECTED` name list and assert it ran 13 times.
+     Worth adding then: `name:` matches the directory, and no file-relative `../templates`
+     path exists — everything routing through `$(git config kaba.scriptdir)` is precisely
+     what makes moving the files safe.
+   - `NOTICE` names `commands/specify.md` and `commands/clarify.md`; retarget it.
+3. **Release hygiene** (Task 13 deferred minors): README overstates jq as required by every
+   script (4 of 11 use it; the guard fails open without it); scripts/ruby needs its
+   ruby 3.3+/Prism install caveat surfaced at install time.
 
 ## v2: adapters
 
@@ -41,9 +68,18 @@ The approved design (§5) keeps the repo flat and puts portability in the *conte
 the directory tree: across all 2,158 lines of command text there are only three
 non-portable reference classes, and `session-lock.sh` — where every enforcement rule
 lives — needs zero changes for Codex (design A.8). Pre-building the adapter seam against
-one consumer would mean guessing where it goes. Also structural: the Claude Code plugin
-loader requires `commands/` and `hooks/hooks.json` at the plugin ROOT, so Claude files
-cannot be tucked into a subdirectory while the repo root IS the plugin.
+one consumer would mean guessing where it goes.
+
+**Correction (2026-08-17):** this section used to add a structural argument — that the
+loader requires `commands/` and `hooks/hooks.json` at the plugin root, so Claude files
+could not be tucked into a subdirectory. That is not true, and the reasoning should not
+lean on it. Per `manifest-findings.md`, `plugin.json`'s `commands` field takes custom
+paths and *replaces* the default scan, `skills` *adds* to it and even accepts `"."` for
+the plugin root, and `hooks` may point elsewhere or be inlined. Only `plugin.json` itself
+must sit at `.claude-plugin/`. Component directories are therefore relocatable today, and
+the marketplace entry can point at a subdirectory regardless. What remains — and it is
+enough on its own — is that designing an adapter seam against exactly one known consumer
+produces the wrong abstraction (design D1).
 
 ### The Claude-specific inventory (what a claude adapter would encapsulate)
 

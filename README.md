@@ -50,6 +50,12 @@ git pre-commit hook shim that backs the enforcement described below. It never co
 
 Run these roughly in order; `clarify`, `fix-tests`, and `research` are optional detours.
 
+Every command that writes a feature artifact checks first whether that step has already completed,
+and stops to ask before spending anything on a regeneration — feature artifacts are untracked at
+that stage, so an accidental re-run would destroy the previous version with no way back. See
+[Re-running a step](docs/workflow.md#re-running-a-step) for which commands gate and why `clarify`
+and `fix-tests` deliberately do not.
+
 | Command | What it does |
 |---|---|
 | `/kaba:init` | Detect the stack, confirm with you, write `.kaba/config.yml`, and wire the enforcement hooks. Run once per repo. |

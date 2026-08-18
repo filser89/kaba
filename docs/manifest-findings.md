@@ -417,3 +417,61 @@ ships must live inside the plugin directory.
 8. `claude plugin details` prices hooks as **"harness-only — no model context cost"**; the spike's one
    command cost ~30 always-on tokens. Per-command always-on cost is the budget to watch as kaba's
    command count grows.
+
+---
+
+## Frontmatter keys — verified 2026-08-17, CLI 2.1.233
+
+Added while planning the F-1 overwrite gate. Both facts bear directly on the pending
+`commands/` → `skills/` migration and were expensive to establish; do not re-derive them.
+
+### `disable-model-invocation` works in `commands/*.md` — the migration is not what buys it
+
+**Spike-observed.** The key lives in the frontmatter schema shared by both layouts, and Claude Code's
+own command documentation covers it: `plugin-dev/skills/command-development/references/frontmatter-reference.md:270`
+documents it under **command** frontmatter, with `---` examples carrying nothing but `description`
+plus the flag. Its stated purpose, verbatim: *"Prevent SlashCommand tool from programmatically
+invoking command"*, and when true: *"Command only invokable by user typing `/command` · Not available
+to SlashCommand tool"*.
+
+Corroborating, on this machine: Anthropic's own `cwc-makers/commands/maker-setup.md:3` sets
+`disable-model-invocation: true` in a plain `commands/` file, and `plugin-dev`'s command-development
+skill states *"The `.claude/commands/` directory is a legacy format… Both are loaded identically —
+the only difference is file layout."* The 2.1.3 changelog entry is *"Merged slash commands and skills,
+simplifying the mental model with no change in behavior"* — which is directly observable here, since
+kaba ships only `commands/` yet its thirteen register as skills.
+
+> **Consequence.** `docs/roadmap.md`'s claim that migrating to `skills/` is what buys
+> `disable-model-invocation` is wrong. The flag can be added wherever the files currently live. The
+> migration has to justify itself on the legacy-layout argument and on the skill-only frontmatter keys
+> (`when_to_use`, `paths`, `hooks`, `context: inline|fork`, `agent`, `background`) instead.
+
+**Not verified:** whether the flag also removes the description from model context. The documentation
+describes invocation blocking only, and the binary carries a refusal string
+(*"cannot be used with Skill tool due to disable-model-invocation"*) implying the model still sees the
+skill and is refused at call time. Do not repeat the context-saving claim without testing it.
+
+### `handoffs:` is a VS Code key and does nothing in Claude Code
+
+**Spike-observed.** `handoffs` is absent from the frontmatter key list compiled into the CLI binary —
+that list runs `…"disable-model-invocation","user-invocable","effort","shell","version","when_to_use","paths","hooks","context","agent",…`
+— and the binary carries an `unknown frontmatter key "…" (expected one of: …)` diagnostic. The
+lowercase string appears exactly once in the whole binary, inside an unrelated remote-control
+heartbeat message; the capitalized occurrences are `WorkflowLaunchHandoffs` symbols from the Workflow
+subsystem. The only `handoffs:` frontmatter anywhere on this machine is kaba's own nine command files.
+
+It is a **VS Code custom-agents** feature. From VS Code's documentation: *"Handoffs enable you to
+create guided sequential workflows that transition between agents with suggested next steps… After a
+chat response completes, handoff buttons appear that let users move to the next agent with relevant
+context and a pre-filled prompt."* The sub-properties match kaba's exactly — `label` is the button
+text, `agent` the target, `prompt` the pre-filled text, `send` auto-submits (default `false`).
+
+kaba inherited it from spec-kit, whose `templates/commands/*.md` are multi-target source templates
+transformed per agent by the `specify` CLI. spec-kit's `AGENTS.md:447` has the Forge integration
+*"Strips `handoffs` frontmatter key"*, and the changelog entry that introduced it reads *"Use VS Code
+handoffs."* It was never a cross-agent convention.
+
+> **Consequence.** There is no handoffs carryover to verify during the migration — the key is inert in
+> `commands/` today. And the pipeline does not chain: only `specify.md`, `init.md`, and `fix-tests.md`
+> name a next step in prose, so after the other ten finish, nothing tells the user or the agent what
+> comes next. Deleting the nine blocks and replacing them with prose pointers is migration-pass work.
