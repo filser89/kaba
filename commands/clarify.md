@@ -186,7 +186,15 @@ proceed, but must warn that downstream rework risk increases.
        - User signals completion ("done", "good", "no more"), OR
        - You reach 5 asked questions.
     - Never reveal future queued questions in advance.
-    - If no valid questions exist at start, immediately report no critical ambiguities.
+    - If no valid questions exist at start, **stop and ask before doing anything else**: the spec has
+      no open questions and no unconfirmed decisions left, so a re-run has nothing to clarify and
+      would only re-derive settled answers, rewriting `spec.md` in the process. Say that, and ask
+      whether to proceed anyway (e.g. the user knows of an ambiguity the scan did not surface). Ask,
+      then **end your turn** — do not answer yourself. Use `AskUserQuestion` if it is available.
+      Continue only on an explicit yes. This is clarify's own version of the prior-run gate the other
+      artifact-producing commands run as a script step; clarify deliberately does **not** gate on its
+      output existing, because re-running to resolve something still unclear is exactly what this
+      command is for.
 
 6. Integration after EACH accepted answer (incremental update approach):
     - Maintain in-memory representation of the spec (loaded once at start) plus the raw file contents.
