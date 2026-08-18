@@ -71,6 +71,31 @@ for name in $SECTIONED; do
   assert_ok "$name has a Next Step section" grep -qx '## Next Step' "$S/$name/SKILL.md"
 done
 
+# --- execution context -------------------------------------------------------------
+# `context: fork` runs a skill in a subagent whose tool calls never enter the parent
+# transcript, and which does NOT inherit the conversation (spike-observed 2026-08-18,
+# CLI 2.1.234 — see docs/manifest-findings.md). review-tests is the only skill that wants
+# it: read-only, self-contained, and better off unable to see the test session's
+# reasoning. Every other skill must stay inline, and the absence is asserted rather than
+# assumed so that forking a second one is a deliberate, reviewed change.
+FORKED="review-tests"
+
+fm_of() { awk 'NR==1 && /^---$/ {next} /^---$/{exit} {print}' "$1"; }
+
+for name in $EXPECTED; do
+  if printf '%s\n' $FORKED | grep -qx "$name"; then
+    assert_stdout_match "$name runs forked" '^context: fork$' fm_of "$S/$name/SKILL.md"
+  else
+    assert_fail "$name declares no context: key" 1 \
+      sh -c "awk 'NR==1 && /^---\$/ {next} /^---\$/{exit} {print}' '$S/$name/SKILL.md' | grep -q '^context:'"
+  fi
+done
+
+# fix-tests is the tempting second candidate and must not become one: it resolves
+# escalated findings interactively with the human, which a fork cannot do.
+assert_ok "fix-tests resolves findings interactively" \
+  grep -qi 'interactiv' "$S/fix-tests/SKILL.md"
+
 # init and specify point at their successor from the report step. fix-tests deliberately
 # has no automatic successor — the human decides when to re-run review (Key Rule 8) — so
 # it is asserted to keep saying that rather than to name a next command.

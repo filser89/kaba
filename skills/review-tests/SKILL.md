@@ -1,6 +1,7 @@
 ---
 name: review-tests
 disable-model-invocation: true
+context: fork
 description: Review the test suite for strength before implementation — could a terrible implementation pass these tests? Read-only; writes a severity-graded findings report.
 ---
 
@@ -11,6 +12,15 @@ $ARGUMENTS
 ```
 
 You **MUST** consider the user input before proceeding (if not empty). The user may narrow the review to specific files, criteria, or categories.
+
+**This command runs forked (`context: fork`), and the arguments above are the only thing it
+receives from the human.** A forked skill does not inherit the conversation: nothing said in the
+test session — no escalation discussion, no "focus on X", no justification for why some assertion
+was left thin — is visible here. That is deliberate. This is the adversarial gate, and a reviewer
+that cannot see the implementer's reasoning cannot be talked out of a finding by it. Two
+consequences: everything you need comes from disk or from the arguments above, so resolve it
+explicitly and never assume prior context; and narrowing only works when the human passes it as
+arguments, so treat an empty input as a full review rather than guessing at an intended scope.
 
 **Scoped review mode**: If the arguments contain criterion IDs (tokens matching `[A-Z]+-\d+`,
 e.g. `DELETE-004 FMT-008`), enter scoped mode — only the listed criteria are reviewed. All other

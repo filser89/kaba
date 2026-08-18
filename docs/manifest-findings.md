@@ -505,3 +505,77 @@ handoffs."* It was never a cross-agent convention.
 > `commands/` today. And the pipeline does not chain: only `specify.md`, `init.md`, and `fix-tests.md`
 > name a next step in prose, so after the other ten finish, nothing tells the user or the agent what
 > comes next. Deleting the nine blocks and replacing them with prose pointers is migration-pass work.
+
+### `context: inline|fork` — a real key, and forks do NOT inherit the conversation
+
+**Environment for this section:** `claude` CLI **2.1.234** (the rest of this doc is 2.1.231/233).
+Spiked 2026-08-18 while deciding whether `/kaba:review-tests` should run forked.
+
+**The key is real, and the binary carries its own definition.** From the compiled frontmatter
+schema, verbatim:
+
+```
+context: Mr(["inline","fork"]).nullable().optional()
+  .describe("Where the skill runs: `inline` expands into the current conversation; `fork` spawns a subagent.")
+```
+
+The default resolves to `inline` — `function M6o(e,t,r){return e.getContext?.(t,r)??e.context??"inline"}`.
+`context` also appears in the frontmatter key list quoted earlier in this doc, so it is accepted
+rather than diagnosed as unknown.
+
+**Doc-only status: there is none.** `plugin-dev`'s `references/frontmatter-reference.md` has no
+`context:` entry and no mention of `fork` — the key is undocumented in the shipped plugin-dev docs.
+Everything below is spike-observed instead.
+
+**Spike used:** throwaway plugin `fork-spike` with paired `inline`/`fork` probes and a PreToolUse
+`Write|Edit` hook, run against a throwaway git project. Deleted after recording.
+
+**1. A fork's tool calls never enter the parent transcript.** Same probe, same prompt, `-p
+--output-format stream-json --verbose`, filtered to message types:
+
+| | `inline` | `fork` |
+|---|---|---|
+| assistant messages in parent stream | 3 (preamble, `Write` tool_use, final line) | **1** (final line only) |
+| `tool_use` visible in parent | `Write` | **none** |
+| tool_result (`user` event) | 1 | **none** |
+| file actually written | yes | **yes** |
+
+So the work happens and only the final text returns. That is the whole point of the key.
+
+**2. PreToolUse hooks fire for tool calls made inside a fork.** The guard logged the forked
+`Write` with the correct `cwd` and `CLAUDE_PROJECT_DIR` — both equal to the project root, same as
+inline.
+
+**3. A hook denial blocks the fork.** With the guard switched to `exit 2` + stderr, the forked
+`Write` was blocked, the file was not created, and the denial reason reached the model *inside* the
+fork, which reported it and declined to route around it via Bash. **The session-lock guard is not
+weakened by forking.**
+
+**4. `$ARGUMENTS` is substituted in a forked skill.** `PROBE=fork ARGS=[HELLOARG]` came back from
+the fork unchanged.
+
+**5. A forked skill does NOT inherit the conversation.** Two-turn sessions via `--session-id` /
+`--resume`; turn 1 stated a secret word, turn 2 invoked the probe:
+
+```
+CTX=inline SECRET=ZORPTANGLE
+CTX=fork   SECRET=NOT_VISIBLE
+```
+
+> **Trap — the word "fork" means the opposite thing one layer up.** The Agent tool's
+> `subagent_type: "fork"` is documented in the same binary as *"inherits full conversation
+> context"*. Skill frontmatter `context: fork` does not. Same word, opposite behavior. A forked
+> skill sees its own body and `$ARGUMENTS`, and nothing the human said in conversation — so
+> anything it needs must come from disk or from arguments.
+
+**6. cwd and `git config` resolution are identical to inline.** A forked Bash call returned the
+project cwd and the correct `git config kaba.scriptdir` value, so kaba's `$(git config
+kaba.scriptdir)` path convention works unchanged. (`CLAUDE_PLUGIN_ROOT` is unset inside Bash tool
+calls in **both** modes — a hook-time variable, not a fork regression. kaba's skill bodies never
+use it.)
+
+**7. `disable-model-invocation: true` composes with `context: fork`.** Every run above invoked the
+skill by the user typing `/fork-spike:<name>` with both keys set.
+
+**Not verified:** whether a fork auto-loads the project's CLAUDE.md. It does not matter for
+`review-tests`, which reads `rules_files` from `.kaba/config.yml` explicitly.
