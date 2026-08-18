@@ -2,11 +2,6 @@
 name: plan-tests
 disable-model-invocation: true
 description: Translate acceptance criteria into a concrete test plan — file locations, factory needs, shared contexts, and criterion-to-file mapping. No test code.
-handoffs:
-  - label: Implement Tests
-    agent: kaba:implement-tests
-    prompt: Implement tests following the test plan
-    send: true
 ---
 
 ## User Input
@@ -399,3 +394,10 @@ If ANY validation check is FAIL, do NOT proceed. Fix the plan and re-validate.
 - **Make no architectural or library decisions.** Plan only the two goals — behavior tests and alignment with existing architecture. If a placement or structure decision needs a not-yet-established production-code fact, STOP and escalate per **Resolution Chain & Escalation**. Test at the behavioral boundary so implementation unknowns (e.g. which library) do NOT block planning.
 - **Invalidation is swept, not guessed.** Existing tests affected by the feature are discovered by suite-wide content probes derived from contract deltas (see **Invalidation Sweep Rules**); every hit is dispositioned KEEP/MODIFY/REMOVE. A file's name never decides whether it is searched — only its content says what it exercises.
 - **test-plan.json is generated, whole, always.** It is the mechanical twin of the Planned State Changes table, emitted on every run (empty is valid and meaningful). No other command or person ever writes it.
+
+## Next Step
+
+With `test-plan.md` and `test-plan.json` written, point the user at `/kaba:implement-tests`, which
+writes the test code against this plan and validates `test-plan.json` against the baseline before
+any test code is written. The plan is a contract from here on: changes require re-running this
+command, never an edit from the test or implementation session.

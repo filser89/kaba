@@ -2,11 +2,6 @@
 name: specify
 disable-model-invocation: true
 description: Author or import a feature specification — scaffold the branch and feature directory via new-feature.sh, then fill kaba's spec template, never inventing requirements the user did not state.
-handoffs:
-  - label: Clarify Spec
-    agent: kaba:clarify
-    prompt: Interrogate and tighten the spec, working the Open Questions list toward empty
-    send: true
 ---
 
 ## User Input

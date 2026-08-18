@@ -127,3 +127,10 @@ The acceptance criteria document MUST follow this structure:
 - **Do NOT make implementation decisions.** Don't decide controller names, method signatures, or routing. Use the same level of specificity as the spec — if the spec names an endpoint path, use it; if it says "the create operation," say that.
 - **Do NOT write test code.** Not even pseudocode. This is a what-to-test document, not a how-to-test document.
 - **Flag, don't guess.** If the spec is ambiguous about a testable behavior, add it to Gaps & Open Questions instead of inventing a criterion.
+
+## Next Step
+
+Once the criteria are written, point the user at `/kaba:plan-tests` — it turns these criteria into
+the test plan that `/kaba:implement-tests` then follows. If **Gaps & Open Questions** came out
+non-empty, say so plainly: those want answers, or another `/kaba:clarify` pass, before a test plan
+is built on top of them.

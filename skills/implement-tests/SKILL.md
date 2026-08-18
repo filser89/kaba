@@ -2,11 +2,6 @@
 name: implement-tests
 disable-model-invocation: true
 description: Write all test code following the test plan. Only test files — no implementation code.
-handoffs:
-  - label: Review Tests
-    agent: kaba:review-tests
-    prompt: Review the implemented tests for quality and coverage
-    send: true
 ---
 
 ## User Input
@@ -129,3 +124,10 @@ The human re-runs `/kaba:plan-tests` with this block as input; it regenerates th
 8. **Tests must register before the implementation exists.** Don't let a test file fail to load/collect by referencing a not-yet-defined symbol at load time (a class in a group header, a top-of-file import). Reference implementation lazily so each test registers and fails at run time. See CLAUDE.md for the project's framework-specific idiom.
 9. **Gate exemptions: smallest unit, justified, or escalate.** Exemptions to any automated quality gate (N+1 detector, linter, type checker, and the like) MUST be scoped to the smallest unit that exhibits the justified pattern — a single test, line, or code path — never a whole file or directory. Every exemption MUST carry a documented justification at the exemption site. If the gate's tooling cannot express an exemption that narrow, escalate rather than widen.
 10. **Existing tests: append, rename only as planned, never delete or reorder.** New blocks go after existing siblings. REMOVE entries are skip-marked, not deleted — deletion belongs to the post-feature cleanup script, never to this session. Violations don't corrupt the gate — they fail it loudly; fix by restoring the file, never by adjusting the plan.
+
+## Next Step
+
+Once the post-test snapshot compare and the banned-pattern scan have both passed, point the user at
+`/kaba:review-tests` — the agent gate that asks whether a deliberately-wrong implementation could
+still make these tests green. If the test-plan defect escalation above was emitted instead, the next
+step is the human re-running `/kaba:plan-tests`, not review.

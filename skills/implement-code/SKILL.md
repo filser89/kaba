@@ -2,11 +2,6 @@
 name: implement-code
 disable-model-invocation: true
 description: Write implementation code to make the locked test suite green, following code-plan.md. Only implementation files — never test files.
-handoffs:
-  - label: Architecture Diff
-    agent: kaba:architecture-diff
-    prompt: Fold the completed feature's architectural delta into the architecture doc
-    send: true
 ---
 
 ## User Input
@@ -97,3 +92,10 @@ You **MUST** consider the user input before proceeding (if not empty). The user 
 8. **Never commit.** Finishing the work and committing it are separate; the human decides when to commit.
 9. **All gates must PASS before reporting done.** No partial-success completion reports.
 10. **Gate exemptions: smallest unit, justified, or escalate.** Exemptions to any automated quality gate (N+1 detector, linter, type checker, and the like) MUST be scoped to the smallest unit that exhibits the justified pattern — a single test, line, or code path — never a whole file or directory. Every exemption MUST carry a documented justification at the exemption site. If the gate's tooling cannot express an exemption that narrow, escalate rather than widen.
+
+## Next Step
+
+Once every end gate has passed and the session lock is clear, the next step is
+`/kaba:architecture-diff`, which folds this feature's architectural delta into
+`.kaba/architecture.md`. It is mandatory at the end of every feature — report it as the next step,
+not as an optional extra.

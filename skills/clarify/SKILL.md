@@ -4,11 +4,6 @@ disable-model-invocation: true
 description: Identify underspecified areas and unconfirmed assumptions in the current feature
   spec by asking up to 5 highly targeted clarification questions, then encode every answer back
   into spec.md.
-handoffs:
-  - label: Acceptance Criteria
-    agent: kaba:acceptance-criteria
-    prompt: Decompose the clarified spec's acceptance scenarios into test-oriented acceptance criteria
-    send: true
 ---
 
 ## User Input
@@ -273,3 +268,10 @@ Report completion (after questioning loop ends or early termination):
   `## Clarifications` bullet — never mark either kind settled without one.
 - **Confirmed vs. overridden are different writes.** Confirming as-is only adds the marker;
   overriding rewrites the statement and cascades to everything derived from it. Never blend the two.
+
+## Next Step
+
+When the Open Questions list is empty and every answer is encoded in `spec.md`, the next step is
+`/kaba:acceptance-criteria`, which decomposes the clarified acceptance scenarios into
+test-oriented criteria. If Outstanding or Deferred items remain, name them and let the user choose
+between proceeding and another `/kaba:clarify` pass later — see **Completion Report**.

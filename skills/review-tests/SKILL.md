@@ -198,6 +198,13 @@ Print a short summary to the conversation (counts + verdict + report path) and s
 8. **Scoped mode merges into the existing report.** Only the scoped criteria are re-reviewed, but
    the report reflects all findings (merged). The verdict applies to the full remaining set.
 
+## Next Step
+
+On a NO-GO verdict, point the user at `/kaba:fix-tests`, which applies these findings to the test
+files and re-validates. On GO, the next step is the human review gate — the final call is theirs,
+not this report's (Key Rule 5). Only after that does Phase 3 begin, with `/kaba:plan-code` in a
+fresh session. Never present implementation as the automatic next step.
+
 ## Context
 
 $ARGUMENTS

@@ -2,11 +2,6 @@
 name: plan-code
 disable-model-invocation: true
 description: Turn the locked test suite into an implementation plan — components, schema, decisions, and dependency-ordered build order to make every test green, consistent with existing architecture. No implementation code.
-handoffs:
-  - label: Implement Code
-    agent: kaba:implement-code
-    prompt: Implement the code following the implementation plan
-    send: true
 ---
 
 ## User Input
@@ -176,3 +171,8 @@ If ANY validation check is FAIL, do NOT proceed. Fix the plan and re-validate.
 - **Ground every decision.** Investigate determinable facts; never guess what is knowable. The same investigation surfaces what must be escalated.
 - **The plan is a contract.** `implement-code` follows it — components, schema, decision verdicts, build order. Changes after this point require re-planning.
 - **Use the project's language and conventions.** All paths, naming, and terminology MUST match what the project actually uses.
+
+## Next Step
+
+With `code-plan.md` written, point the user at `/kaba:implement-code`, which builds against the
+locked test suite in this plan's dependency order.

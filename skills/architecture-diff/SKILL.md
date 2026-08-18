@@ -2,10 +2,6 @@
 name: architecture-diff
 disable-model-invocation: true
 description: Fold the just-completed feature's architectural delta into .kaba/architecture.md. Mandatory at the end of every feature.
-handoffs:
-  - label: Build Specification
-    agent: kaba:specify
-    prompt: The architecture doc is up to date. Start the next feature specification. I want to build...
 ---
 
 ## User Input
@@ -49,3 +45,12 @@ Either a changelog —
 - **Idempotent**: regenerate the candidate entry and write only if a documented field differs. Same state in → zero edits.
 - **Reality wins**: the diff + code are authoritative; `code-plan.md` only interprets.
 - **Apply the method file** for the significance decision and all definitions; do not override its rules.
+
+## Next Step
+
+The architecture doc is now current, which closes out the feature. Point the user at
+`/kaba:specify` for the next one — and ask what they want to build rather than proposing it
+yourself. The next specification starts from the user's own one-liner, not from this feature's
+leftovers. If this feature had REMOVE entries, mention that
+`$(git config kaba.scriptdir)/cleanup-tests.sh` deletes the skip-marked tests and runs only
+between features, with the human reviewing the deletion diff.

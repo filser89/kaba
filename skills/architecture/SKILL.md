@@ -2,10 +2,6 @@
 name: architecture
 disable-model-invocation: true
 description: Full codebase scan that creates or rebuilds the project architecture document at .kaba/architecture.md. Human-triggered (project setup, or when the doc is suspected stale).
-handoffs:
-  - label: Build Specification
-    agent: kaba:specify
-    prompt: Now that the architecture is documented, build the next feature specification. I want to build...
 ---
 
 ## User Input
@@ -52,3 +48,9 @@ Produce `.kaba/architecture.md` from a full scan of the codebase: a current-stat
 - **Patterns, not inventory** — one entry per layer, not per file.
 - **Canonical examples and pattern files are real paths**, never inlined snippets.
 - **Apply the method file** for every definition and judgment; do not re-derive or override its rules here.
+
+## Next Step
+
+With the architecture documented, point the user at `/kaba:specify` to start a feature
+specification — and ask what they want to build rather than proposing it yourself. The
+specification starts from the user's own one-liner; this command has no basis for guessing it.

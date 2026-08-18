@@ -38,6 +38,11 @@ for name in $EXPECTED; do
   assert_stdout_match "$name blocks model invocation" '^disable-model-invocation: true$' \
     awk 'NR>1 && /^---$/{exit} NR>1{print}' "$f"
 
+  # `handoffs:` is a VS Code custom-agents key, inert in Claude Code — inherited from
+  # spec-kit's multi-target templates. It must not come back: it reads as working
+  # next-step wiring while doing nothing at all.
+  assert_fail "$name carries no inert handoffs: key" 1 grep -q '^handoffs:' "$f"
+
   # Every template read must route through the pinned script dir. A file-relative
   # ../templates would resolve against the skill directory and break the moment the
   # layout moves again — which is exactly what this migration just did.
@@ -49,6 +54,29 @@ done
 assert_eq "every expected skill was checked" "13" "$checked"
 assert_eq "exactly 13 skill directories" "13" \
   "$(ls -d "$S"/*/ | wc -l | tr -d ' ')"
+
+# --- next-step guidance ------------------------------------------------------------
+# Deleting the inert `handoffs:` blocks would otherwise leave ten of thirteen skills
+# ending on nothing. Ten now carry a `## Next Step` section; the three below already
+# said it in prose and keep saying it where they said it.
+SECTIONED="acceptance-criteria architecture architecture-diff clarify implement-code \
+implement-tests plan-code plan-tests research review-tests"
+INLINE="fix-tests init specify"
+
+assert_eq "sectioned + inline covers every skill" \
+  "$(printf '%s\n' $EXPECTED | sort | tr '\n' ' ')" \
+  "$(printf '%s\n' $SECTIONED $INLINE | sort | tr '\n' ' ')"
+
+for name in $SECTIONED; do
+  assert_ok "$name has a Next Step section" grep -qx '## Next Step' "$S/$name/SKILL.md"
+done
+
+# init and specify point at their successor from the report step. fix-tests deliberately
+# has no automatic successor — the human decides when to re-run review (Key Rule 8) — so
+# it is asserted to keep saying that rather than to name a next command.
+assert_ok "init points at specify"       grep -q 'kaba:specify.*next step'  "$S/init/SKILL.md"
+assert_ok "specify points at clarify"    grep -q 'kaba:clarify.*next step'  "$S/specify/SKILL.md"
+assert_ok "fix-tests declines a handoff" grep -qi 'no automatic handoff'    "$S/fix-tests/SKILL.md"
 
 # --- F-1: the prior-run gate ------------------------------------------------------
 # Positive, negative, and count must all agree, so adding a gate without updating this

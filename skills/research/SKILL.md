@@ -2,10 +2,6 @@
 name: research
 disable-model-invocation: true
 description: Investigate a single open question for the current feature given this project's stack, and append a short recommendation to research-log.md for the human to decide on. Human-facing decision support — no other command reads its output.
-handoffs:
-  - label: Resume Test Planning
-    agent: kaba:plan-tests
-    prompt: 'Resume test planning. My decision: <state it here before sending>'
 ---
 
 ## User Input
@@ -63,3 +59,10 @@ Weigh options by: **fit with the existing stack/deps** (reuse what is there) · 
 - **The human is the consumer.** No command reads `research-log.md`. Do not write it as machine input; write it for a person deciding.
 - **Feature-scoped.** It lives at `FEATURE_DIR/research-log.md` and concerns only this feature.
 - **Append-only log.** One entry per run, newest last, separated by `---`. Never overwrite or rewrite earlier entries — they may record recommendations the human has already ratified. The filename is deliberate: `research.md` is the filename other spec-driven workflows commonly use in the same feature directory for a different purpose — never write that filename, only `research-log.md`.
+
+## Next Step
+
+This command informs the human and nothing else — no workflow command reads `research-log.md`.
+Report the recommendation and stop there. The decision is the user's to make, and they resume the
+phase they paused (commonly `/kaba:plan-tests`) by stating that decision themselves. Never present
+the recommendation as settled, and never carry it forward into another command yourself.
