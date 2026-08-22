@@ -5,7 +5,7 @@ not a prompt pack. The two-session split (tests first, implementation second) an
 between them are held by git hooks and pass/fail scripts, not by asking the agent nicely. See
 [docs/workflow.md](docs/workflow.md) for the full pipeline and the reasoning behind it.
 
-**v1 targets Rails/RSpec projects.** The scripts themselves are generic bash + git, but the
+**Kaba currently targets Rails/RSpec projects.** The scripts themselves are generic bash + git, but the
 conventions they assume (`bundle exec rspec`, `bundle exec rubocop`, RSpec's `receive` /
 `expect_any_instance_of` banned patterns, an RSpec-file AST helper for test cleanup) are Rails
 shaped. Other stacks are out of scope for now.
