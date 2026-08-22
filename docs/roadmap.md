@@ -47,13 +47,26 @@
   were the legacy layout and the skill-only frontmatter keys — of which `context: fork` is the
   one that actually paid.
 
+- **Allowlist schema v3 — F-2 + F-3** (2026-08-19). One vocabulary fix closes both
+  acceptance findings: `test-plan.json` entries are now `{action, expected_landing}`
+  over MODIFY/REMOVE/PIN/TOUCH (PIN: expected-green new examples, identified by file +
+  exact planned description — F-2; TOUCH: status-preserving content edits — F-3).
+  Snapshots are version 2 with per-example Prism AST digests
+  (`scripts/ruby/digest_examples.rb`; formatting-immune, loop groups share one digest),
+  so a content edit with no status flip is now a compare violation unless allowlisted.
+  Two mechanical guards landed with it: validate-plan writes
+  `snapshots/test-plan.lock.json` and compare rejects any in-session plan edit that
+  isn't a provenance-stamped `allowlist-append` (the new snapshot-tests.sh mode
+  fix-tests runs on human-approved escalations — TOUCH/MODIFY only; REMOVE/PIN stay
+  plan-time). Migration is a clean break: v1 snapshots and v2 plans are rejected
+  loudly — a feature mid-flight finishes on kaba v1.0 or restarts its test session.
+  The compare rule matrix finally has behavioral tests
+  (`test/snapshot_compare_test.sh`, fixture-driven). Design:
+  `docs/superpowers/specs/2026-08-19-allowlist-schema-v3-design.md` (untracked).
+
 ### Remaining
 
-1. **F-2 + F-3** — test-plan.json allowlist schema v3: `{action, expected_landing}`
-   entries (MODIFY/REMOVE/PIN/TOUCH), per-example AST digests in snapshots, and
-   human-approved fix-tests escalations appending their own allowlist entries. One fix,
-   two findings. See `acceptance-findings.md`.
-2. **Release hygiene** (deferred minors from the extraction): README overstates jq as required by every
+1. **Release hygiene** (deferred minors from the extraction): README overstates jq as required by every
    script (4 of 11 use it; the guard fails open without it); scripts/ruby needs its
    ruby 3.3+/Prism install caveat surfaced at install time.
 

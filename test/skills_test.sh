@@ -151,3 +151,13 @@ assert_ok "specify gates before new-feature.sh" test "$gs" -lt "$ns"
 assert_fail "clarify does not call check-artifacts.sh" 1 grep -q 'check-artifacts\.sh' "$S/clarify/SKILL.md"
 assert_ok   "clarify gates on a settled spec instead"  grep -qi 'no open questions and no unconfirmed decisions' "$S/clarify/SKILL.md"
 assert_ok   "clarify ends the turn after asking"       grep -qi 'end your turn' "$S/clarify/SKILL.md"
+
+# Allowlist schema v3: the three pipeline skills and the template speak it.
+SK="$SCRIPT_DIR/../skills"
+assert_ok "plan-tests emits schema v3"           grep -q '"version": 3' "$SK/plan-tests/SKILL.md"
+assert_ok "plan-tests knows PIN"                 grep -q '"PIN"' "$SK/plan-tests/SKILL.md"
+assert_ok "plan-tests knows expected_landing"    grep -q 'expected_landing' "$SK/plan-tests/SKILL.md"
+assert_ok "template table has Expected landing"  grep -q 'Expected landing' "$SCRIPT_DIR/../templates/test-plan-template.md"
+assert_ok "implement-tests documents the criterion marker" grep -q '# CRITERION-ID' "$SK/implement-tests/SKILL.md"
+assert_ok "implement-tests mentions the plan lock"         grep -q 'test-plan.lock.json' "$SK/implement-tests/SKILL.md"
+assert_ok "fix-tests invokes allowlist-append" grep -q 'allowlist-append' "$SK/fix-tests/SKILL.md"

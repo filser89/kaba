@@ -68,7 +68,7 @@ The agent does the typing. The human does the thinking (what to test, what the c
 | 18 | Snapshot: compare | Compare post-impl vs post-test (see Snapshot Comparison Rules) | Pass/fail report |
 | 19 | Gate: linter | The project's configured linter (`linter_command`) must pass; any suite-embedded checks (e.g. N+1 detection) ride along for free inside the same green `test_command` run | Pass/fail |
 
-Steps 17–19 run **inline inside `/kaba:implement-code`** as end gates (same pattern as implement-tests owning its snapshot steps), plus a fourth inline gate: the test directory must be untouched per version control — it catches in-place test edits the snapshot compare cannot see (a tampered test transitions `failed→passed`, exactly what the compare expects).
+Steps 17–19 run **inline inside `/kaba:implement-code`** as end gates (same pattern as implement-tests owning its snapshot steps), plus a fourth inline gate: the test directory must be untouched per version control. That remains defense in depth behind digest comparison, including examples whose digest cannot be resolved.
 
 #### Phase 4: Completion
 
@@ -83,21 +83,24 @@ Steps 17–19 run **inline inside `/kaba:implement-code`** as end gates (same pa
 
 ### Snapshot Comparison Rules
 
-Snapshots record the state (passed/failed/pending) of every test example in the suite. Capture and compare are **separate operations**: capture runs the test suite and saves to a named JSON file; compare takes two snapshot files and reports pass/fail. Three snapshots are captured per feature, with two comparisons.
+Snapshots record the state (passed/failed/pending) and a formatting-insensitive structural digest of every resolvable test example in the suite. Capture and compare are **separate operations**: capture runs the test suite and saves to a named JSON file; compare takes two snapshot files and reports pass/fail. Three snapshots are captured per feature, with two comparisons.
 
 #### Post-Test Session (snapshot 2 vs baseline)
 
 | Test Category | Expected State | Violation Means |
 |---------------|---------------|-----------------|
-| New tests (from this feature) | Red (failed) | Implementation leaked into test session |
-| MODIFY-allowlisted tests | Red (failed) — or unchanged | Modification asserts already-existing behavior, or went to pending |
+| New tests, not PIN-allowlisted | Red (failed) | Implementation leaked into test session |
+| PIN-allowlisted new tests | Green (passed) | Behavior expected to conform does not, or the planned description drifted |
+| MODIFY-allowlisted tests | Entry's expected landing (`failed` or `passed`) | Modification landed on the wrong state |
 | REMOVE-allowlisted tests | Pending (skip-marked) | Planned removal not executed |
+| TOUCH-allowlisted tests | Same status, changed structural digest | Planned content edit did not occur, or changed status |
+| Other existing test content | Same structural digest when available | Unplanned test-body edit |
 | All other previously green tests | Green (passed) | Unintended regression |
 | All other previously red tests | Red (failed) | Accidental fix or interference |
 | Any test, removed from the suite | Never | In-session deletion — removals are skip-marked, deleted post-feature |
 | Any test → pending, unallowlisted | Never | A test was switched off without a REMOVE entry |
 
-The allowlist is `FEATURE_DIR/test-plan.json` (schema v2): per-test addresses + verified descriptions, generated whole by `plan-tests` from the plan's Planned State Changes table and validated against the baseline at session start (`validate-plan`). A group address covers every example under it. Unused MODIFY entries surface as compare warnings for the human review; an unexecuted REMOVE is a violation.
+The allowlist is `FEATURE_DIR/test-plan.json` (schema v3): `{action, expected_landing}` entries over MODIFY/REMOVE/PIN/TOUCH. `plan-tests` generates it whole from the Planned State Changes table; `validate-plan` checks it against the baseline and writes `snapshots/test-plan.lock.json`. A group address covers every example under it for id-based actions; PIN matches an exact file + planned full description. During fix-tests, a human-approved escalation may add only a provenance-stamped TOUCH or MODIFY through `allowlist-append`; compare rejects every other in-session plan edit. Unused MODIFY/TOUCH and unfulfilled PIN entries surface as warnings; an unexecuted REMOVE is a violation.
 
 #### Post-Implementation (snapshot 3 vs post-test)
 
@@ -107,6 +110,7 @@ The allowlist is `FEATURE_DIR/test-plan.json` (schema v2): per-test addresses + 
 | Modified tests (from this feature) | Green (passed) | Implementation incomplete |
 | All other previously green tests | Green (passed) | Unintended regression |
 | All other previously red tests | Red (failed) | Accidental fix or interference |
+| Existing test content | Unchanged structural digest when available | Test edited during implementation |
 
 ### Snapshot Script Invocation Map
 
@@ -116,7 +120,8 @@ The snapshot script (`$(git config kaba.scriptdir)/snapshot-tests.sh`) is called
 |---|---|---|
 | `identities` | `/kaba:plan-tests` | Survey — dry-run identity listing; sole source for allowlist addresses and descriptions |
 | `capture baseline` | `/kaba:implement-tests` | Beginning — refuses to overwrite the baseline while test work is in progress (resume mode) |
-| `validate-plan` | `/kaba:implement-tests` | Beginning — `test-plan.json` (v2) checked against the baseline, before any test code |
+| `validate-plan` | `/kaba:implement-tests` | Beginning — `test-plan.json` (v3) checked against the baseline and locked, before any test code |
+| `allowlist-append` | `/kaba:fix-tests` | During a human-approved escalation — append one provenance-stamped TOUCH/MODIFY entry resolved from the baseline |
 | `capture post-test` | `/kaba:implement-tests`; `/kaba:fix-tests` (overwrite) | End — after all test code is written / after fixes |
 | `compare post-test` | `/kaba:implement-tests`; `/kaba:fix-tests` | End — immediately after post-test capture; snapshots and allowlist resolved from the feature dir |
 | `capture post-impl` | `/kaba:implement-code` | End — after all implementation code is written |

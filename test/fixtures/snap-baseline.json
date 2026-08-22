@@ -1,0 +1,16 @@
+{
+  "version": 2,
+  "metadata": {"captured_at": "2026-08-19T00:00:00Z", "branch": "007-fixture",
+               "commit": "abc1234", "feature": "007-fixture", "name": "baseline"},
+  "examples": [
+    {"id": "./spec/a_spec.rb[1:1]", "full_description": "A does one",
+     "status": "passed", "file_path": "./spec/a_spec.rb", "line_number": 4, "digest": "d-a1"},
+    {"id": "./spec/a_spec.rb[1:2]", "full_description": "A does two",
+     "status": "passed", "file_path": "./spec/a_spec.rb", "line_number": 9, "digest": "d-a2"},
+    {"id": "./spec/b_spec.rb[1:1]", "full_description": "B fails now",
+     "status": "failed", "file_path": "./spec/b_spec.rb", "line_number": 4, "digest": "d-b1"},
+    {"id": "./spec/b_spec.rb[1:2]", "full_description": "B has no digest",
+     "status": "passed", "file_path": "./spec/b_spec.rb", "line_number": 9, "digest": null}
+  ],
+  "summary": {"total": 4, "passed": 3, "failed": 1, "pending": 0}
+}

@@ -57,7 +57,10 @@ This is a **planning step**, not a writing step. No test code is produced. The o
 
 9. **Run the invalidation sweep**: Apply the **Invalidation Sweep Rules** below to every contract delta from step 4 — derive probes, run them as content searches over the entire test directory, resolve hits to examples via the step-4 identity listing, and disposition every hit example as KEEP, MODIFY, or REMOVE. Record probes, hits, and dispositions for the plan's Invalidation Sweep section. If step 4 recorded no contract deltas, record that and continue.
 
-10. **Plan state changes**: Derive the Planned State Changes table from the step-9 dispositions: every MODIFY/REMOVE disposition becomes a row — action, identity, description (both copied from the step-4 identity listing, never composed from reading spec source), and reason. A row may also arise outside the sweep (an existing example changing for a reason other than a contract delta, e.g. extended to cover a new criterion); each such row carries its own reason traceable to the spec. File-level (MODIFY) markings in Test File headings must agree with this table: a file marked MODIFY has at least one MODIFY row; a file with MODIFY rows is marked MODIFY.
+10. **Plan state changes**: Derive the Planned State Changes table from the step-9 dispositions: every MODIFY/REMOVE disposition becomes a row — action, identity, description (both copied from the step-4 identity listing, never composed from reading spec source), expected landing, and reason. Two further actions extend the table beyond sweep dispositions:
+    - **PIN** — a planned NEW example that lands green because the behavior already conforms but is untested. A PIN row carries no address (the example does not exist yet): its identity is the file plus the exact planned full description, which must match the file's Describe Blocks plan verbatim. Expected landing is always `passed`.
+    - **TOUCH** — a planned status-preserving content edit to an existing example (e.g. extending it to cover a new criterion without flipping its status). Identity comes from the identity listing like MODIFY; expected landing is always `unchanged`. Do NOT plan a TOUCH where the edit flips the status — that is a MODIFY.
+    A row may also arise outside the sweep (an existing example changing for a reason other than a contract delta); each such row carries its own reason traceable to the spec. File-level (MODIFY) markings in Test File headings must agree with this table: a file marked MODIFY has at least one MODIFY or TOUCH row; a file with MODIFY or TOUCH rows is marked MODIFY.
 
 11. **Self-validate the plan**: Run every check in the Validation Checklist below. If any check fails, fix the plan before proceeding. Do NOT silently skip failures.
 
@@ -65,17 +68,26 @@ This is a **planning step**, not a writing step. No test code is produced. The o
 
     ```json
     {
-      "version": 2,
+      "version": 3,
       "feature": "[feature dir name]",
       "source": "test-plan.md",
       "entries": [
-        {"action": "MODIFY|REMOVE", "id": "[identity]", "file": "[file path]",
-         "description": "[recorded description]"}
+        {"action": "MODIFY", "expected_landing": "failed",
+         "id": "[identity]", "file": "[file path]", "description": "[recorded description]"},
+        {"action": "REMOVE", "expected_landing": "pending",
+         "id": "[identity]", "file": "[file path]", "description": "[recorded description]"},
+        {"action": "PIN", "expected_landing": "passed",
+         "file": "[file path, RSpec form with leading ./]",
+         "description": "[exact planned full description of the not-yet-written example]"},
+        {"action": "TOUCH", "expected_landing": "unchanged",
+         "id": "[identity]", "file": "[file path]", "description": "[recorded description]"}
       ]
     }
     ```
 
-    An empty `entries` array is an affirmative statement: this plan declares no modifications and no removals. The JSON is machine-written by this command, whole, on every run.
+    Legal pairs: MODIFY → `failed` (or `passed` when the modified assertion already holds — a conforming modify), REMOVE → `pending`, PIN → `passed`, TOUCH → `unchanged`. PIN is the only action without an `id` — the example does not exist yet, so its identity is the file plus the exact planned full description (describe path + example description), which `implement-tests` must reproduce byte-for-byte. Never emit `source` or `finding` keys — those mark in-session appends by fix-tests, not plan authorship.
+
+    An empty `entries` array is an affirmative statement: this plan declares no state changes. The JSON is machine-written by this command, whole, on every run.
 
 13. **Report**: Print a summary with format validation (see Report Format below).
 
@@ -337,13 +349,14 @@ Before writing the plan document, verify ALL of the following. If any check fail
 7. **Used-by consistency**: Every test file that lists a factory or helper in Dependencies appears in that factory/helper's Used-by list, and vice versa.
 8. **Path conventions**: All file paths use the project's actual naming conventions, extensions, and directory layout.
 9. **Criteria Mapping table matches**: The Criteria Mapping table at the end is a 1:1 match with the per-file Criteria lists — same criterion, same file, no discrepancies.
-10. **State-change entries resolve**: Every Planned State Changes row's identity exists in the step-4 identity listing (a group address must match at least one example), and its description equals the listing's recorded description byte-for-byte (for a group address: every matched example's description starts with it). A row that fails is a plan error — fix it from the listing, never by editing the string freehand.
+10. **State-change entries resolve**: Every Planned State Changes row's identity exists in the step-4 identity listing (a group address must match at least one example), and its description equals the listing's recorded description byte-for-byte (for a group address: every matched example's description starts with it). A row that fails is a plan error — fix it from the listing, never by editing the string freehand. PIN rows are checked in the inverse direction: their file + description must match NO example in the identity listing — a PIN that matches an existing example is a plan error (it should be a TOUCH or MODIFY).
 11. **MODIFY consistency**: Test File headings marked MODIFY and the Planned State Changes table agree in both directions.
 12. **Removal reasons**: Every REMOVE row has a concrete reason traceable to the spec.
 13. **Delta completeness**: Every spec statement phrased as a change to existing behavior maps to a contract delta, and every delta has at least one request-boundary probe plus, where semantics change, at least one storage-boundary probe.
 14. **Sweep coverage**: Every probe was run over the entire test directory, and every hit example carries exactly one disposition — none silently dropped.
 15. **Disposition–table consistency**: Every MODIFY/REMOVE disposition has a matching Planned State Changes row, and every row either traces to a disposition or carries its own reason.
 16. **KEEP satisfiability**: No KEEP disposition's reason contradicts any delta's new contract — a KEEP that asserts the old contract is a plan error.
+17. **Landing legality**: Every entry's `(action, expected_landing)` pair is legal — MODIFY → failed|passed, REMOVE → pending, PIN → passed, TOUCH → unchanged — and every PIN's planned description equals, byte-for-byte, the example description its file's Describe Blocks section plans.
 
 ## Report Format
 
@@ -377,6 +390,7 @@ Otherwise the report MUST include:
 - [ ] Sweep coverage: [PASS/FAIL]
 - [ ] Disposition–table consistency: [PASS/FAIL]
 - [ ] KEEP satisfiability: [PASS/FAIL]
+- [ ] Landing legality: [PASS/FAIL]
 ```
 
 If ANY validation check is FAIL, do NOT proceed. Fix the plan and re-validate.
@@ -393,7 +407,7 @@ If ANY validation check is FAIL, do NOT proceed. Fix the plan and re-validate.
 - **Use the project's language and conventions.** All file paths, extensions, naming patterns, and terminology MUST match what the project actually uses. Do NOT default to any specific language or framework.
 - **Make no architectural or library decisions.** Plan only the two goals — behavior tests and alignment with existing architecture. If a placement or structure decision needs a not-yet-established production-code fact, STOP and escalate per **Resolution Chain & Escalation**. Test at the behavioral boundary so implementation unknowns (e.g. which library) do NOT block planning.
 - **Invalidation is swept, not guessed.** Existing tests affected by the feature are discovered by suite-wide content probes derived from contract deltas (see **Invalidation Sweep Rules**); every hit is dispositioned KEEP/MODIFY/REMOVE. A file's name never decides whether it is searched — only its content says what it exercises.
-- **test-plan.json is generated, whole, always.** It is the mechanical twin of the Planned State Changes table, emitted on every run (empty is valid and meaningful). No other command or person ever writes it.
+- **test-plan.json is generated, whole, always.** It is the mechanical twin of the Planned State Changes table, emitted on every run (empty is valid and meaningful). The only lawful later extension is a provenance-stamped TOUCH/MODIFY entry written by fix-tests through `allowlist-append`; no person edits it directly.
 
 ## Next Step
 

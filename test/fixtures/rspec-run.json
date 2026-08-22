@@ -1,0 +1,11 @@
+{
+  "examples": [
+    {"id": "./spec/a_spec.rb[1:1]", "full_description": "A does one", "status": "failed",
+     "file_path": "./spec/a_spec.rb", "line_number": 4},
+    {"id": "./spec/a_spec.rb[1:2]", "full_description": "A does two", "status": "passed",
+     "file_path": "./spec/a_spec.rb", "line_number": 9},
+    {"id": "./spec/a_spec.rb[1:3]", "full_description": "A unmapped", "status": "passed",
+     "file_path": "./spec/a_spec.rb", "line_number": 999}
+  ],
+  "summary": {"errors_outside_of_examples_count": 0}
+}

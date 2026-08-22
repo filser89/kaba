@@ -31,7 +31,7 @@ You **MUST** consider the user input before proceeding (if not empty). The user 
 3. **Arm the session lock, establish the baseline, validate the plan**:
    1. Run `$(git config kaba.scriptdir)/session-lock.sh set test` from repo root — this locks implementation code for the duration of the test session (enforced by the PreToolUse guard and the pre-commit hook).
    2. Run `$(git config kaba.scriptdir)/snapshot-tests.sh capture baseline` from repo root. The script decides fresh-start vs resume itself: with a clean test directory it (re)captures; with in-progress test work it refuses to overwrite an existing baseline and keeps it — recapturing over half-written tests would absorb them into the baseline and silently exempt them from the new-test gate.
-   3. Run `$(git config kaba.scriptdir)/snapshot-tests.sh validate-plan` from repo root. This checks every entry of `FEATURE_DIR/test-plan.json` (schema v2) against the baseline: identity exists, description matches byte-for-byte. If it FAILS, the plan is stale relative to reality — STOP and emit the test-plan defect escalation (see Escalation below) with the validator's per-entry errors. Do not write any test code past a failed validation.
+   3. Run `$(git config kaba.scriptdir)/snapshot-tests.sh validate-plan` from repo root. This checks every entry of `FEATURE_DIR/test-plan.json` (schema v3) against the baseline: identities and descriptions resolve, PINs do not already exist, and action/landing pairs are legal. If it FAILS, the plan is stale relative to reality — STOP and emit the test-plan defect escalation (see Escalation below) with the validator's per-entry errors. Do not write any test code past a failed validation. On PASS the validator also writes `snapshots/test-plan.lock.json` — the plan lock. The post-test compare verifies the live `test-plan.json` against it: any in-session edit to a locked entry fails the gate, so the plan file is hands-off from here.
 
 4. **Survey existing test infrastructure**:
    - The test directory is `test_dir` in `.kaba/config.yml` — read it from there; never infer it from project structure.
@@ -56,6 +56,8 @@ You **MUST** consider the user input before proceeding (if not empty). The user 
      - Create the describe/context/it block hierarchy matching test-plan.md's Describe Blocks exactly.
      - Write test blocks with descriptive names derived from the acceptance criteria.
      - Each test block must contain a real assertion that exercises the criterion's behavior.
+     - **Pin examples are contract**: an example backing a PIN entry must carry the plan's full description byte-for-byte (describe path + example description) — compare matches pins by exact file + description, and a wording drift lands as a "new test should be failed" violation with an unmatched-PIN hint.
+     - **End every example's opening line with a trailing `# CRITERION-ID` comment** naming the criterion it covers (e.g. `it "rejects blank name" do # VAL-001`). review-tests and fix-tests locate tests by this marker; it is prose for them, never parsed by scripts.
    - **For each MODIFY file**:
      - Read the existing file first to understand its current structure.
      - Add new describe/context/it blocks as specified in test-plan.md's Describe Blocks for this file.
@@ -69,13 +71,18 @@ You **MUST** consider the user input before proceeding (if not empty). The user 
 
 7. **Snapshot post-test and compare**:
    1. Run `$(git config kaba.scriptdir)/snapshot-tests.sh capture post-test`
-   2. Run `$(git config kaba.scriptdir)/snapshot-tests.sh compare post-test` — the script resolves both snapshots and `test-plan.json` from the feature directory itself and dies if the plan file is missing or not schema v2.
+   2. Run `$(git config kaba.scriptdir)/snapshot-tests.sh compare post-test` — the script resolves both snapshots and `test-plan.json` from the feature directory itself and dies if the plan file is missing or not schema v3.
    - **If compare FAILS**, diagnose by violation type:
      - New test not failed → assertions are trivially true (or a REMOVE marker landed on the wrong test). Fix the assertions so they exercise real behavior.
      - Changed test not in the allowlist → either support files broke existing test setup (fix without altering existing behavior), or the plan is missing an entry — that is a test-plan defect: STOP and escalate (see Escalation below). Never "fix" this by touching test-plan.json.
-     - Allowlisted MODIFY not landing on failed → the modification asserts already-existing behavior or went to pending. Strengthen the assertion; transitions to pending are never excused for MODIFY.
+     - Allowlisted MODIFY not landing on its expected landing → the result contradicts the planned transition. Strengthen or correct the assertion; transitions to pending are never excused for MODIFY.
      - REMOVE entry not pending → the removal marker is missing or on the wrong test.
      - Unexpected removals → an existing test was deleted or blocks were reordered. Restore from version control; removal is never done by deletion in-session.
+     - Allowlisted PIN not landing passed → the pinned behavior does not actually conform. That contradicts the plan's premise: STOP and escalate (test-plan defect) — never "fix" it by weakening the example into passing.
+     - New green test with an "unmatched PIN entries" hint → the pin exists but the wording drifted. Align the example's description to the plan byte-for-byte.
+     - Digest-drift violation ("content changed without status change") → an existing example's body was edited outside the plan. Revert it, or if the change is genuinely required, that is a test-plan defect: STOP and escalate.
+     - TOUCH on a status flip → TOUCH cannot excuse a transition; restore the original status or escalate for a MODIFY entry.
+     - "plan edited in-session" (lock check) → test-plan.json diverged from the validated lock. Restore the file from the lock and re-run; the plan is only ever changed by /kaba:plan-tests or a fix-tests allowlist-append.
      - Re-capture post-test and re-compare after fixes. Repeat until PASS.
    - The compare also prints WARNINGS for unused MODIFY entries (planned change that never happened). Warnings do not fail the gate — carry them into the completion report for the human review.
 
@@ -120,7 +127,7 @@ The human re-runs `/kaba:plan-tests` with this block as input; it regenerates th
 4. **Tests must fail for the right reason.** Missing implementation is a correct failure. Syntax errors, factory misconfiguration, or missing requires are incorrect failures. Run the test suite periodically during implementation to catch setup errors early.
 5. **No banned patterns.** `$(git config kaba.scriptdir)/banned-patterns.sh` codifies the greppable banned patterns from the project rules. Private method testing is also banned but requires judgment — it cannot be detected mechanically.
 6. **Respect existing infrastructure.** Do not modify existing test configuration or support files. Add new files; don't overwrite existing ones.
-7. **The test plan is a contract, and its allowlist is the gate's input.** If the plan has errors or gaps, STOP and emit the test-plan defect escalation — do not silently deviate, and never edit test-plan.md or test-plan.json from this session. Re-planning belongs to `/kaba:plan-tests`.
+7. **The test plan is a contract, and its allowlist is the gate's input.** If the plan has errors or gaps, STOP and emit the test-plan defect escalation — do not silently deviate, and never edit test-plan.md or test-plan.json from this session. Re-planning belongs to `/kaba:plan-tests`. The lock (`snapshots/test-plan.lock.json`) makes this mechanical — compare fails on any in-session plan edit.
 8. **Tests must register before the implementation exists.** Don't let a test file fail to load/collect by referencing a not-yet-defined symbol at load time (a class in a group header, a top-of-file import). Reference implementation lazily so each test registers and fails at run time. See CLAUDE.md for the project's framework-specific idiom.
 9. **Gate exemptions: smallest unit, justified, or escalate.** Exemptions to any automated quality gate (N+1 detector, linter, type checker, and the like) MUST be scoped to the smallest unit that exhibits the justified pattern — a single test, line, or code path — never a whole file or directory. Every exemption MUST carry a documented justification at the exemption site. If the gate's tooling cannot express an exemption that narrow, escalate rather than widen.
 10. **Existing tests: append, rename only as planned, never delete or reorder.** New blocks go after existing siblings. REMOVE entries are skip-marked, not deleted — deletion belongs to the post-feature cleanup script, never to this session. Violations don't corrupt the gate — they fail it loudly; fix by restoring the file, never by adjusting the plan.

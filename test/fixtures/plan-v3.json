@@ -1,0 +1,15 @@
+{
+  "version": 3,
+  "feature": "007-fixture",
+  "source": "test-plan.md",
+  "entries": [
+    {"action": "PIN", "expected_landing": "passed",
+     "file": "./spec/c_spec.rb", "description": "C pins existing"},
+    {"action": "MODIFY", "expected_landing": "failed",
+     "id": "./spec/a_spec.rb[1:1]", "file": "./spec/a_spec.rb", "description": "A does one"},
+    {"action": "REMOVE", "expected_landing": "pending",
+     "id": "./spec/b_spec.rb[1:1]", "file": "./spec/b_spec.rb", "description": "B fails now"},
+    {"action": "TOUCH", "expected_landing": "unchanged",
+     "id": "./spec/a_spec.rb[1:2]", "file": "./spec/a_spec.rb", "description": "A does two"}
+  ]
+}

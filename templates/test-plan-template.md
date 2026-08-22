@@ -64,22 +64,24 @@
 ## Planned State Changes
 
 <!--
-  Machine-enforced allowlist of existing tests this feature intends to change. plan-tests
-  generates test-plan.json from this table verbatim; the compare gate consults only the
-  JSON. Derived from the Invalidation Sweep: every MODIFY/REMOVE disposition above becomes
-  a row; a row may also arise outside the sweep with its own recorded reason. If the
-  feature touches no existing tests, state "None" — the JSON is still emitted,
-  empty.
-
-  - Addresses and descriptions are copied from the identity scan — never composed by hand.
-  - A group address (e.g. `[1:2]` with no third segment) allowlists every example under it.
-  - MODIFY: the test is expected to land red at post-test. REMOVE: the test will be
-    skip-marked in-session and deleted by the cleanup script after the feature.
+  Machine-enforced allowlist of test-suite state changes this feature intends.
+  plan-tests generates test-plan.json (schema v3) from this table, whole, on
+  every run. Four actions:
+  - MODIFY: existing example, expected to change status. Lands on its Expected
+    landing at post-test — `failed` normally; `passed` only for a conforming
+    modify (the new-contract assertion already holds).
+  - REMOVE: existing example, skip-marked for removal. Lands `pending`.
+  - PIN: NEW example pinning already-conforming behavior. Lands `passed`. No
+    address — identity is file + the exact planned full description.
+  - TOUCH: existing example, content edit with NO status change. Lands
+    `unchanged` (digest drift excused, status flip never).
+  - A group address (e.g. `[1:2]` with no third segment) allowlists every example
+    under it (MODIFY/REMOVE/TOUCH only; PIN is always exact).
 -->
 
-| Action | Identity (address) | Description | Reason |
-|--------|--------------------|-------------|--------|
-| [MODIFY \| REMOVE] | [adapter identity string, e.g. ./spec/models/x_spec.rb[1:2]] | [exact recorded description] | [why this test must change / is obsolete] |
+| Action | Identity (address) | Description | Expected landing | Reason |
+|--------|--------------------|-------------|------------------|--------|
+| [MODIFY/REMOVE/PIN/TOUCH] | [address, or — for PIN] | [description] | [failed/pending/passed/unchanged] | [reason] |
 
 ## Factories
 

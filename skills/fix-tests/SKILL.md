@@ -144,6 +144,8 @@ You can pick an option, ask me questions about any of them, or describe your own
 - Once resolved, apply the chosen fix immediately. Log to the in-memory report with status
   RESOLVED, including: the question asked, the human's choice, their rationale, and before/after
   code.
+- **Out-of-plan existing tests need an allowlist entry with the approval.** When the chosen fix touches a pre-existing example not in the plan's allowlist, the human's approval authorizes exactly one machine append. Immediately before applying the fix, run from the repo root: `$(git config kaba.scriptdir)/snapshot-tests.sh allowlist-append --action TOUCH|MODIFY --id <exact example id> --landing <unchanged|failed|passed> --finding <FindingID>` — TOUCH when the example's status will not change (content-only edit), MODIFY (with the landing the human approved) when it will. The script resolves the identity from the baseline and stamps provenance; never edit test-plan.json or test-plan.md by hand. If the approved fix is REMOVE- or PIN-shaped, or implies the invalidation sweep missed further examples, do NOT append — that is a test-plan defect: STOP and emit implement-tests' escalation block.
+- Log every append in the report (action, id, landing, finding).
 - If the human says "skip" or "leave it", do NOT apply any change. Log as SKIPPED with the reason.
 
 ### 7. Re-validate
@@ -156,7 +158,9 @@ After all fixes (mechanical + resolved escalations) are applied:
 2. **Snapshot compare**: Run `$(git config kaba.scriptdir)/snapshot-tests.sh compare post-test` — the
    script resolves both snapshots and `test-plan.json` from the feature directory itself.
    All new tests must still be red (failed). No test should have accidentally become green from
-   the fix.
+   the fix. Appended allowlist entries (step 6) are printed by the compare under
+   `ALLOWLIST` section — confirm the appended list matches exactly the
+   approvals logged in this session, and carry it into the report.
 3. **Banned pattern scan**: Run `$(git config kaba.scriptdir)/banned-patterns.sh` with the paths of all
    modified test files as positional arguments. If it reports FAIL, the fix introduced a banned
    pattern — rework the fix and re-run until PASS.
@@ -247,6 +251,7 @@ After:
 **Question**: [the question posed to the human]
 **Choice**: [which option the human picked, or "custom" with description]
 **Rationale**: [why they picked it — from the conversation]
+**Allowlist appended**: [none, or `TOUCH|MODIFY <id> → <landing> (finding <ID>)`]
 
 Before:
 ```
@@ -299,11 +304,7 @@ After:
     never a whole file or directory. Every exemption MUST carry a documented justification
     at the exemption site. If the gate's tooling cannot express an exemption that narrow,
     escalate rather than widen.
-12. **The plan's allowlist binds fixes too.** Fixes may touch this feature's tests and
-    allowlisted tests only. A finding that requires a state change to any other existing
-    test is a test-plan defect: STOP and emit implement-tests' escalation block. REMOVE-
-    marked (pending) tests stay pending — never resurrect or delete them here. Never
-    touch test-plan.md or test-plan.json.
+12. **The plan's allowlist binds fixes too — and only `allowlist-append` may extend it.** Fixes may touch this feature's tests and allowlisted tests only. A human-approved escalated fix to an out-of-plan existing test appends its own TOUCH or MODIFY entry via `snapshot-tests.sh allowlist-append` (see step 6); the compare's plan-lock check rejects any other plan edit. REMOVE- and PIN-shaped needs, and anything suggesting the invalidation sweep was incomplete, remain test-plan defects: STOP and emit implement-tests' escalation block. REMOVE-marked (pending) tests stay pending — never resurrect or delete them here. Never edit test-plan.md or test-plan.json directly.
 
 ## Context
 
