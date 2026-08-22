@@ -14,11 +14,17 @@ shaped. Other stacks are out of scope for now.
 
 **Dependencies:**
 
-- `git` ≥ 2.28 and `jq` — required for every command and script.
-- `ruby` ≥ 3.3 — required only for `scripts/cleanup-tests.sh`, which uses
-  `scripts/ruby/delete_removed_examples.rb` to delete skip-marked-for-removal RSpec examples via
-  [Prism](https://github.com/ruby/prism) (Ruby's own parser, stdlib since 3.3). Everything else
-  ships with no Ruby dependency.
+- `git` ≥ 2.28 — required by the workflow and its enforcement gates.
+- `jq` — used by four enforcement scripts. It is required by `scripts/snapshot-tests.sh` and
+  `scripts/cleanup-tests.sh`; `scripts/banned-patterns.sh` needs it only for `--json` output;
+  and the real-time `scripts/session-lock-guard.sh` deliberately fails open without it while the
+  git pre-commit boundary remains active. Install `jq` to retain the complete enforcement and
+  reporting path.
+- `ruby` ≥ 3.3 with [Prism](https://github.com/ruby/prism) — required for snapshot capture and
+  test cleanup. `scripts/ruby/digest_examples.rb` computes the structural test digests used by
+  every captured snapshot; `scripts/ruby/delete_removed_examples.rb` deletes skip-marked RSpec
+  examples after a feature. Prism ships with Ruby starting in 3.3, and capture fails loudly when
+  Ruby or Prism is unavailable. No other scripts require Ruby.
 
 **Try it without installing** — loads the plugin for one session only:
 

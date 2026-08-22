@@ -64,11 +64,16 @@
   (`test/snapshot_compare_test.sh`, fixture-driven). Design:
   `docs/superpowers/specs/2026-08-19-allowlist-schema-v3-design.md` (untracked).
 
+- **Release hygiene** (2026-08-22). The install documentation now describes dependency scope
+  instead of claiming `jq` is universal: `snapshot-tests.sh` and `cleanup-tests.sh` require it,
+  `banned-patterns.sh` uses it only for JSON output, and `session-lock-guard.sh` fails open without
+  it while the git boundary remains active. The same section now surfaces Ruby 3.3+/Prism as a
+  hard dependency for snapshot capture as well as test cleanup, including both shipped AST helpers.
+  Regression assertions keep these operational caveats in the README.
+
 ### Remaining
 
-1. **Release hygiene** (deferred minors from the extraction): README overstates jq as required by every
-   script (4 of 11 use it; the guard fails open without it); scripts/ruby needs its
-   ruby 3.3+/Prism install caveat surfaced at install time.
+None.
 
 ## v2: adapters
 

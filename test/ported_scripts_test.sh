@@ -36,3 +36,14 @@ assert_ok "cleanup-tests points at the shipped helper" grep -q "ruby/delete_remo
 # The digest helper (allowlist schema v3) is ruby-by-necessity like its sibling.
 assert_file_exists "digest helper is shipped" "$S/ruby/digest_examples.rb"
 assert_fail "digest helper has no '.specify' reference" 1 grep -q "\.specify" "$S/ruby/digest_examples.rb"
+
+# Release hygiene: dependency claims must reflect the scripts that actually use
+# them, especially Ruby now that snapshot capture has a hard Prism digest pass.
+README="$SCRIPT_DIR/../README.md"
+assert_fail "README does not claim jq is universal" 1 \
+  grep -q 'required for every command and script' "$README"
+for f in banned-patterns snapshot-tests cleanup-tests session-lock-guard; do
+  assert_ok "README names jq consumer $f" grep -q "$f" "$README"
+done
+assert_ok "README names snapshot capture Ruby dependency" grep -qi 'snapshot capture' "$README"
+assert_ok "README names the digest helper" grep -q 'digest_examples\.rb' "$README"
