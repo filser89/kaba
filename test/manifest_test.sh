@@ -3,6 +3,14 @@ set -uo pipefail
 SCRIPT_DIR="$(CDPATH="" cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 . "$SCRIPT_DIR/assert.sh"
 M="$SCRIPT_DIR/../.claude-plugin"
+ROOT="$SCRIPT_DIR/.."
+
+# Claude Code and Codex load different repository instruction filenames. Both
+# must exist and remain one contract rather than drifting into agent-specific rules.
+assert_file_exists "Claude instructions exist" "$ROOT/CLAUDE.md"
+assert_file_exists "Codex instructions exist" "$ROOT/AGENTS.md"
+assert_ok "Claude and Codex instructions are identical" cmp -s "$ROOT/CLAUDE.md" "$ROOT/AGENTS.md"
+assert_ok "agent rules define the changelog contract" grep -q '^## Changelog$' "$ROOT/CLAUDE.md"
 
 # plugin.json and marketplace.json duplicate version and description. They drift
 # silently, and a stale marketplace version makes `claude plugin update` a no-op —

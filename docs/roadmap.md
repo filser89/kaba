@@ -1,81 +1,13 @@
 # Kaba Roadmap
 
-## Versioning
+Kaba currently supports Claude Code with Rails/RSpec. This roadmap contains only future
+work; completed user-visible changes are recorded in `CHANGELOG.md`.
 
-- **v1.0 — shipped.** What exists today: a Claude Code plugin for exactly one stack
-  (Rails/RSpec), validated end-to-end by the acceptance run on markly (feature
-  006-bookmark-favorites, 2026-08-15). One harness, one stack, on purpose.
-- **v1.1 — hardening.** Fix what the acceptance run and platform review surfaced. Same
-  scope as v1.0: no new harnesses, no new stacks — just making v1 solid. The backlog is
-  below; the defect details live in `acceptance-findings.md`.
-- **v2 — the adapter era.** A second harness (Codex) and/or a second stack, with the repo
-  restructure that separation requires. Trigger: a second *real* consumer, not before —
-  designing adapters against exactly one known consumer produces the wrong abstraction.
+## Adapter support
 
-## v1.1 backlog
-
-### Shipped
-
-- **commands/ → skills/ migration** (2026-08-18). All thirteen moved to
-  `skills/<name>/SKILL.md`, each carrying a `name:` key matching its directory. Invocation
-  (`/kaba:<name>`) and `hooks/hooks.json` are unchanged, and `plugin.json` needed no edit —
-  `skills/` is scanned by default. `disable-model-invocation: true` on all thirteen, which
-  also drops their descriptions from model context in every project the plugin is enabled in.
-  The nine `handoffs:` blocks — a VS Code custom-agents key, inert in Claude Code, inherited
-  from spec-kit — are gone, replaced by `## Next Step` prose in the ten skills that would
-  otherwise end on nothing; the three that had omitted `send: true` (`architecture`,
-  `architecture-diff`, `research`) ask the human for input rather than presenting the next
-  step as automatic. `test/commands_test.sh` → `test/skills_test.sh`, driven off the
-  `EXPECTED` name list rather than a `skills/*/SKILL.md` glob, so a directory missing its
-  `SKILL.md` fails loudly instead of dropping out of the matrix into a green suite. `NOTICE`
-  retargeted — and `test/manifest_test.sh`'s NOTICE-path extractor widened, since its old
-  `[a-z-]*/[a-z-]*\.md` pattern would have matched nothing against the new paths and checked
-  nothing while still reporting green.
-
-  **`review-tests` runs `context: fork`.** Spiked before adopting, since the key is
-  undocumented in plugin-dev's frontmatter reference — full findings in `manifest-findings.md`.
-  A forked skill's tool calls never enter the parent transcript; PreToolUse hooks still fire
-  for them and a denial still blocks them, so the session-lock guard is not weakened. The
-  surprise: a fork does **not** inherit the conversation — the opposite of the Agent tool's
-  identically-named `subagent_type: "fork"`. For the adversarial test gate that blindness is
-  the feature: a reviewer that cannot see the implementer's reasoning cannot be talked out of
-  a finding by it. `fix-tests` is the tempting second candidate and must not follow — it
-  resolves escalated findings interactively with the human, which a fork cannot do.
-
-  For the record, this item's original rationale was wrong: it claimed the migration is what
-  buys `disable-model-invocation`. That key works in `commands/*.md` too. The real arguments
-  were the legacy layout and the skill-only frontmatter keys — of which `context: fork` is the
-  one that actually paid.
-
-- **Allowlist schema v3 — F-2 + F-3** (2026-08-19). One vocabulary fix closes both
-  acceptance findings: `test-plan.json` entries are now `{action, expected_landing}`
-  over MODIFY/REMOVE/PIN/TOUCH (PIN: expected-green new examples, identified by file +
-  exact planned description — F-2; TOUCH: status-preserving content edits — F-3).
-  Snapshots are version 2 with per-example Prism AST digests
-  (`scripts/ruby/digest_examples.rb`; formatting-immune, loop groups share one digest),
-  so a content edit with no status flip is now a compare violation unless allowlisted.
-  Two mechanical guards landed with it: validate-plan writes
-  `snapshots/test-plan.lock.json` and compare rejects any in-session plan edit that
-  isn't a provenance-stamped `allowlist-append` (the new snapshot-tests.sh mode
-  fix-tests runs on human-approved escalations — TOUCH/MODIFY only; REMOVE/PIN stay
-  plan-time). Migration is a clean break: v1 snapshots and v2 plans are rejected
-  loudly — a feature mid-flight finishes on kaba v1.0 or restarts its test session.
-  The compare rule matrix finally has behavioral tests
-  (`test/snapshot_compare_test.sh`, fixture-driven). Design:
-  `docs/superpowers/specs/2026-08-19-allowlist-schema-v3-design.md` (untracked).
-
-- **Release hygiene** (2026-08-22). The install documentation now describes dependency scope
-  instead of claiming `jq` is universal: `snapshot-tests.sh` and `cleanup-tests.sh` require it,
-  `banned-patterns.sh` uses it only for JSON output, and `session-lock-guard.sh` fails open without
-  it while the git boundary remains active. The same section now surfaces Ruby 3.3+/Prism as a
-  hard dependency for snapshot capture as well as test cleanup, including both shipped AST helpers.
-  Regression assertions keep these operational caveats in the README.
-
-### Remaining
-
-None.
-
-## v2: adapters
+A second harness (Codex) and/or a second stack will trigger the repository restructure
+that separation requires. The trigger is a second *real* consumer, not a target version:
+designing adapters against exactly one known consumer produces the wrong abstraction.
 
 ### Why there is no `adapters/` directory yet
 
