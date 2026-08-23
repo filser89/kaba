@@ -2,6 +2,15 @@
 
 ## [Unreleased]
 
+### Added
+
+- Added installable Codex packaging, explicit-only skill metadata, and Codex `apply_patch` enforcement while keeping the existing Claude package and marketplace.
+
+### Changed
+
+- Preserved `review-tests` conversation isolation in Codex by delegating to a fresh-context reviewer when native forked skill execution is unavailable.
+- Made SessionStart rewiring resolve Codex's `cwd` payload and the active installed plugin path.
+
 ## [0.3.0] - 2026-08-22
 
 ### Added

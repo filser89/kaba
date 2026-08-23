@@ -1,7 +1,7 @@
 # Kaba — Spec-Driven TDD Plugin
 
 ## Project Overview
-Kaba is a Claude Code plugin that ships a mechanically-enforced spec-driven TDD workflow.
+Kaba is a Claude Code and Codex plugin that ships a mechanically-enforced spec-driven TDD workflow.
 Scripts are bash 3.2 compatible. External dependencies are `git`, `jq`, and Ruby 3.3+ with
 Prism for snapshot digests and test cleanup.
 Run tests with `bash test/run.sh`.

@@ -1,0 +1,5 @@
+interface:
+  display_name: "Review Tests"
+  short_description: "Adversarially review the locked test suite"
+policy:
+  allow_implicit_invocation: false

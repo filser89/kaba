@@ -1,0 +1,28 @@
+{
+  "name": "kaba",
+  "version": "0.3.0",
+  "description": "A mechanically-enforced spec-driven TDD workflow. Tests are written and locked before implementation code, and git-based gates — not prompts — enforce the boundary. Currently targets Rails/RSpec.",
+  "author": {
+    "name": "Sergey Filippov",
+    "email": "sergey.filippov.shanghai@gmail.com",
+    "url": "https://github.com/filser89"
+  },
+  "homepage": "https://github.com/filser89/kaba",
+  "repository": "https://github.com/filser89/kaba",
+  "license": "MIT",
+  "keywords": ["tdd", "spec-driven-development", "rails", "rspec", "testing"],
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "Kaba",
+    "shortDescription": "Mechanically enforced spec-driven TDD",
+    "longDescription": "Write and lock tests before implementation, with git-backed gates that enforce the boundary throughout a spec-driven workflow.",
+    "developerName": "Sergey Filippov",
+    "category": "Developer Tools",
+    "capabilities": ["Spec-driven TDD", "Git-backed enforcement", "Rails/RSpec"],
+    "websiteURL": "https://github.com/filser89/kaba",
+    "defaultPrompt": [
+      "Use Kaba to start a new feature in this repository.",
+      "Use Kaba to continue the active feature workflow."
+    ]
+  }
+}

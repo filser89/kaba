@@ -1,0 +1,5 @@
+interface:
+  display_name: "Acceptance Criteria"
+  short_description: "Turn feature scenarios into testable criteria"
+policy:
+  allow_implicit_invocation: false

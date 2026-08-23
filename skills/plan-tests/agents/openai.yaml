@@ -1,0 +1,5 @@
+interface:
+  display_name: "Plan Tests"
+  short_description: "Map acceptance criteria into a concrete test plan"
+policy:
+  allow_implicit_invocation: false

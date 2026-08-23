@@ -1,9 +1,9 @@
 # kaba
 
-kaba is a Claude Code plugin that ships a **mechanically-enforced spec-driven TDD workflow** —
-not a prompt pack. The two-session split (tests first, implementation second) and the boundary
-between them are held by git hooks and pass/fail scripts, not by asking the agent nicely. See
-[docs/workflow.md](docs/workflow.md) for the full pipeline and the reasoning behind it.
+kaba is a Claude Code and Codex plugin that ships a **mechanically-enforced spec-driven TDD
+workflow** — not a prompt pack. The two-session split (tests first, implementation second) and
+the boundary between them are held by git hooks and pass/fail scripts, not by asking the agent
+nicely. See [docs/workflow.md](docs/workflow.md) for the full pipeline and the reasoning behind it.
 
 **Kaba currently targets Rails/RSpec projects.** The scripts themselves are generic bash + git, but the
 conventions they assume (`bundle exec rspec`, `bundle exec rubocop`, RSpec's `receive` /
@@ -26,35 +26,48 @@ shaped. Other stacks are out of scope for now.
   examples after a feature. Prism ships with Ruby starting in 3.3, and capture fails loudly when
   Ruby or Prism is unavailable. No other scripts require Ruby.
 
-**Try it without installing** — loads the plugin for one session only:
+**Claude Code — try it without installing** (one session only):
 
 ```bash
 claude --plugin-dir /path/to/kaba
 ```
 
-**Real install**, via kaba's self-hosted marketplace (the same repo doubles as its own
-marketplace catalog):
+**Claude Code — install** from Kaba's self-hosted marketplace:
 
 ```bash
 claude plugin marketplace add /path/to/kaba          # or a git URL once the repo is shared
 claude plugin install kaba@kaba-marketplace -y
 ```
 
-Install defaults to `--scope user`, which enables the plugin — including its `PreToolUse`
-guard — in **every project you open**, not just kaba projects. The guard fails open immediately
-in any repo without a `.kaba/config.yml`, so this is safe, but pass `--scope project` instead if
-you want the plugin scoped to one repo.
+Claude's install defaults to `--scope user`, which enables the plugin — including its
+`PreToolUse` guard — in **every project you open**, not just Kaba projects. The guard fails open
+immediately in any repo without a `.kaba/config.yml`; pass `--scope project` instead to scope it
+to one repo.
 
-## Get started: `/kaba:init`
+**Codex — install** from the same repository and marketplace:
 
-Run `/kaba:init` once per repo. It inspects the project, proposes a configuration, asks for your
-confirmation, then writes `.kaba/config.yml`, creates the feature directory, and installs the
-git pre-commit hook shim that backs the enforcement described below. It never commits on its own
-— the new `.kaba/` files need a commit from you.
+```bash
+codex plugin marketplace add /path/to/kaba
+codex plugin add kaba@kaba-marketplace
+```
+
+Codex treats newly installed plugin hooks as untrusted until they are reviewed. Trust the Kaba
+hooks only after checking the two commands in `hooks/hooks.json`; without that trust the skills
+remain available, but the real-time hook feedback does not run.
+
+## Get started
+
+Run `/kaba:init` in Claude Code or `$kaba:init` in Codex once per repo. It inspects the project,
+proposes a configuration, asks for your confirmation, then writes `.kaba/config.yml`, creates the
+feature directory, and installs the git pre-commit hook shim that backs the enforcement described
+below. It never commits on its own — the new `.kaba/` files need a commit from you.
 
 ## The command sequence
 
 Run these roughly in order; `clarify`, `fix-tests`, and `research` are optional detours.
+
+The table uses Claude Code syntax. In Codex, invoke the same skill explicitly as
+`$kaba:<name>`; for example, `/kaba:plan-tests` becomes `$kaba:plan-tests`.
 
 Every command that writes a feature artifact checks first whether that step has already completed,
 and stops to ask before spending anything on a regeneration — feature artifacts are untracked at
@@ -99,12 +112,12 @@ Two layers, and they are not equally weighted:
   installed by `/kaba:init` via `core.hooksPath`) and the implementation session's end gates
   (snapshot compare + test-directory-untouched, run inline by `/kaba:implement-code`). Both inspect
   the working tree or the index, so they catch a violation no matter how it got there.
-- **The `PreToolUse` guard** (`hooks/hooks.json`, self-registered by the plugin — no
-  `settings.json` edit required) is real-time feedback on path-declaring tool calls: it blocks the
-  agent's own `Write`/`Edit`/`NotebookEdit` calls to locked paths at the moment of the edit. It is
-  a fast, cooperative layer on top of the guarantee, not a replacement for it — `--no-verify` can
-  bypass the pre-commit hook, and both checks run inside the same session they police, so this is
-  drift prevention for a cooperating agent, not security against a hostile one.
+- **The `PreToolUse` guard** (`hooks/hooks.json`, self-registered by the plugin) is real-time
+  feedback on path-declaring tool calls. It checks Claude's `Write`/`Edit`/`NotebookEdit` paths and
+  every add/update/delete/move path in a Codex `apply_patch` call. It is a fast, cooperative layer
+  on top of the guarantee, not a replacement for it — shell-based edits and `--no-verify` can
+  bypass a real-time or commit-time check, so this is drift prevention for a cooperating agent,
+  not security against a hostile one.
 
 See [docs/workflow.md](docs/workflow.md) for the full pipeline, the snapshot comparison rules, and
 the session-lock mechanics behind both layers.

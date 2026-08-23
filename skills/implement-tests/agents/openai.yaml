@@ -1,0 +1,5 @@
+interface:
+  display_name: "Implement Tests"
+  short_description: "Write tests from the approved test plan"
+policy:
+  allow_implicit_invocation: false

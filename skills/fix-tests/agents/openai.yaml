@@ -1,0 +1,5 @@
+interface:
+  display_name: "Fix Tests"
+  short_description: "Repair tests from adversarial review findings"
+policy:
+  allow_implicit_invocation: false

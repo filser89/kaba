@@ -1,0 +1,5 @@
+interface:
+  display_name: "Plan Code"
+  short_description: "Plan implementation from the locked tests"
+policy:
+  allow_implicit_invocation: false

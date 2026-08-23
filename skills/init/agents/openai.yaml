@@ -1,0 +1,5 @@
+interface:
+  display_name: "Initialize Kaba"
+  short_description: "Configure Kaba and install repository gates"
+policy:
+  allow_implicit_invocation: false

@@ -9,6 +9,7 @@ make_plugin() {
   local ver="$1" base; base="$(mktemp -d)"
   base="$(cd "$base" && pwd -P)"
   mkdir -p "$base/$ver/scripts"
+  cp "$REWIRE" "$base/$ver/scripts/session-start-rewire.sh"
   printf '%s' "$base/$ver"
 }
 
@@ -24,6 +25,12 @@ make_repo() {
 }
 
 run() { CLAUDE_PLUGIN_ROOT="$1" CLAUDE_PROJECT_DIR="$2" bash "$REWIRE"; }
+run_codex() {
+  local payload
+  payload="$(jq -nc --arg cwd "$2" '{cwd:$cwd}')"
+  printf '%s' "$payload" | env -u CLAUDE_PLUGIN_ROOT -u CLAUDE_PROJECT_DIR \
+    bash "$1/scripts/session-start-rewire.sh"
+}
 pin() { git -C "$1" config kaba.scriptdir 2>/dev/null || true; }
 
 assert_ok "session-start-rewire.sh is executable" test -x "$REWIRE"
@@ -43,6 +50,13 @@ assert_eq "stale pin is re-pointed at the running version" "$new/scripts" "$(pin
 
 git -C "$r" config kaba.scriptdir "$old/scripts"   # re-stale it; the run above fixed it
 assert_stdout_match "rewire says what it did" 're-pointed kaba.scriptdir' run "$new" "$r"
+
+# Codex provides cwd in the SessionStart payload. The installed script can
+# derive its plugin root from its own location, so no Claude-specific runtime
+# environment is required.
+git -C "$r" config kaba.scriptdir "$old/scripts"
+assert_ok "Codex payload rewires stale pin" run_codex "$new" "$r"
+assert_eq "Codex payload pins the running plugin" "$new/scripts" "$(pin "$r")"
 
 # --- idempotent: an already-correct pin is left alone and stays quiet -------------
 out="$(run "$new" "$r")"

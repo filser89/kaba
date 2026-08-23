@@ -1,0 +1,5 @@
+interface:
+  display_name: "Architecture"
+  short_description: "Build the project's current architecture map"
+policy:
+  allow_implicit_invocation: false

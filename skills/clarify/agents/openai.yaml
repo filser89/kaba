@@ -1,0 +1,5 @@
+interface:
+  display_name: "Clarify"
+  short_description: "Close specification gaps with targeted questions"
+policy:
+  allow_implicit_invocation: false

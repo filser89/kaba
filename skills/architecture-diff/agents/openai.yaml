@@ -1,0 +1,5 @@
+interface:
+  display_name: "Architecture Diff"
+  short_description: "Fold a feature delta into the architecture map"
+policy:
+  allow_implicit_invocation: false

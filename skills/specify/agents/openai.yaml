@@ -1,0 +1,5 @@
+interface:
+  display_name: "Specify"
+  short_description: "Create or import a Kaba feature specification"
+policy:
+  allow_implicit_invocation: false

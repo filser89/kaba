@@ -1,0 +1,5 @@
+interface:
+  display_name: "Research"
+  short_description: "Research one open feature decision"
+policy:
+  allow_implicit_invocation: false

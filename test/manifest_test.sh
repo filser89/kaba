@@ -3,6 +3,7 @@ set -uo pipefail
 SCRIPT_DIR="$(CDPATH="" cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 . "$SCRIPT_DIR/assert.sh"
 M="$SCRIPT_DIR/../.claude-plugin"
+C="$SCRIPT_DIR/../.codex-plugin"
 ROOT="$SCRIPT_DIR/.."
 
 # Claude Code and Codex load different repository instruction filenames. Both
@@ -28,6 +29,24 @@ assert_stdout_match "version is semver" '^[0-9]+\.[0-9]+\.[0-9]+$' printf '%s' "
 # `claude plugin validate` warns without an author, and --strict promotes that to an error.
 assert_stdout_match "plugin declares an author" '.' jq -r '.author.name // empty' "$M/plugin.json"
 assert_stdout_match "marketplace declares an owner" '.' jq -r '.owner.name // empty' "$M/marketplace.json"
+
+# Codex uses a separate manifest schema but loads the same plugin root. Shared
+# identity fields must not drift across hosts, and Codex-specific presentation
+# metadata must remain present for ingestion.
+c_ver="$(jq -r '.version'     "$C/plugin.json")"
+c_dsc="$(jq -r '.description' "$C/plugin.json")"
+assert_eq "Claude and Codex manifests agree on version"     "$p_ver" "$c_ver"
+assert_eq "Claude and Codex manifests agree on description" "$p_dsc" "$c_dsc"
+assert_eq "Codex manifest discovers root skills" "./skills/" \
+  "$(jq -r '.skills' "$C/plugin.json")"
+assert_stdout_match "Codex manifest has a display name" '.' \
+  jq -r '.interface.displayName // empty' "$C/plugin.json"
+assert_stdout_match "Codex manifest has a default prompt" '.' \
+  jq -r '.interface.defaultPrompt[0] // empty' "$C/plugin.json"
+assert_fail "Codex manifest does not declare unsupported hooks field" 1 \
+  jq -e 'has("hooks")' "$C/plugin.json"
+assert_ok "shared marketplace points Codex at the plugin root" \
+  jq -e '.plugins[] | select(.name=="kaba" and .source=="./")' "$M/marketplace.json"
 
 # Only plugin.json belongs inside .claude-plugin/; components live at the plugin root.
 for d in skills scripts hooks templates; do

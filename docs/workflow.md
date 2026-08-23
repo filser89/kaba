@@ -114,7 +114,7 @@ The allowlist is `FEATURE_DIR/test-plan.json` (schema v3): `{action, expected_la
 
 ### Snapshot Script Invocation Map
 
-The snapshot script (`$(git config kaba.scriptdir)/snapshot-tests.sh`) is called inline by commands, same as `resolve-feature.sh`. No Claude Code hooks needed.
+The snapshot script (`$(git config kaba.scriptdir)/snapshot-tests.sh`) is called inline by commands, same as `resolve-feature.sh`. No host lifecycle hooks are needed.
 
 | Script call | Command | When |
 |---|---|---|
@@ -196,8 +196,8 @@ The two-session boundary is enforced by a lock with one state file and one rule 
 
 - **State**: `.kaba/session-lock` (git-ignored) holds `test` or `implement`; absent = unrestricted. `/kaba:implement-tests` sets `test` at its start; `/kaba:implement-code` sets `implement` at its start and clears the lock after all end gates pass — a completed feature leaves the repo unrestricted, so the lock is armed only between the test session and the end of the implementation session. Manual override: `$(git config kaba.scriptdir)/session-lock.sh status|clear`.
 - **Rules** (complement of `test_dir`, derived from `.kaba/config.yml`, in `session-lock.sh check`): `implement` may write everything **except** `test_dir`; `test` may write **only** `test_dir`, `feature_dir`, and the configured `test_writable` carve-outs. The rule is a complement, not a hand-maintained deny-list of implementation territory — nothing project-specific needs to be kept in sync as the codebase grows.
-- **PreToolUse guard** (`hooks/hooks.json`, self-registered by the plugin — no `settings.json` edit needed): blocks the agent's `Write`/`Edit`/`NotebookEdit` calls to locked paths at the moment of the edit, giving real-time feedback on path-declaring tool calls.
-- **SessionStart rewire** (same file): re-points `kaba.scriptdir` at the plugin copy that is actually running. `/kaba:init` pins that path absolutely, and a marketplace install puts the version in it, so every version bump would otherwise strand it — leaving new command text calling scripts out of the old directory. Fails open in any repo without `.kaba/config.yml`, and never pins at a scripts directory that does not exist.
+- **PreToolUse guard** (`hooks/hooks.json`, self-registered by the plugin): blocks Claude's direct-path edit tools and every declared path in a Codex `apply_patch` call, giving real-time feedback before path-declaring edits.
+- **SessionStart rewire** (same file): re-points `kaba.scriptdir` at the plugin copy that is actually running. `/kaba:init` or `$kaba:init` pins that path absolutely, and a marketplace install puts the version in it, so every version bump would otherwise strand it — leaving new skill text calling scripts out of the old directory. It resolves Claude's project environment or Codex's `cwd` payload, fails open in any repo without `.kaba/config.yml`, and never pins at a scripts directory that does not exist.
 - **Pre-commit hook** (`.kaba/hooks/pre-commit`, installed into the consumer repo by `/kaba:init`): validates staged paths at the commit boundary via `core.hooksPath`. (`--no-verify` can bypass — guardrail, not security.)
 
 The **normal-workflow guarantee** is the pair of git-based checks — the pre-commit hook and the implementation session's end gates. They inspect the working tree and the index, so they are indifferent to how a change arrived. The PreToolUse guard is real-time feedback layered on top of them, not a substitute. These are drift controls for a cooperating agent, not a security boundary against deliberate bypass.

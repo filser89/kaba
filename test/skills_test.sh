@@ -27,6 +27,13 @@ for name in $EXPECTED; do
   assert_fail "$name has no 'specs/' feature dir" 1 grep -q "specs/"        "$f"
   assert_stdout_match "$name has frontmatter" '^---$' head -1 "$f"
 
+  # Claude enforces explicit-only invocation from SKILL.md frontmatter. Codex
+  # reads the equivalent host policy from agents/openai.yaml.
+  agent="$S/$name/agents/openai.yaml"
+  assert_file_exists "$name has Codex skill metadata" "$agent"
+  assert_stdout_match "$name blocks implicit Codex invocation" \
+    '^  allow_implicit_invocation: false$' grep 'allow_implicit_invocation:' "$agent"
+
   # Invocation namespaces off the directory name, so a `name:` that disagrees with the
   # directory is a lie in the manifest even though /kaba:<dir> keeps working.
   assert_ok "$name declares name: matching its directory" \
@@ -95,6 +102,16 @@ done
 # escalated findings interactively with the human, which a fork cannot do.
 assert_ok "fix-tests resolves findings interactively" \
   grep -qi 'interactiv' "$S/fix-tests/SKILL.md"
+
+# Codex does not implement Claude's context: fork frontmatter. review-tests bridges
+# the same boundary explicitly with a fresh subagent and a recursion marker; the
+# parent is forbidden from reading the review inputs or writing the report.
+assert_ok "review-tests creates a no-history Codex reviewer" \
+  grep -q 'fork_turns: "none"' "$S/review-tests/SKILL.md"
+assert_ok "review-tests marks the isolated reviewer task" \
+  grep -q 'KABA_ISOLATED_REVIEWER=1' "$S/review-tests/SKILL.md"
+assert_ok "review-tests forbids inline Codex review" \
+  grep -q 'parent must not perform' "$S/review-tests/SKILL.md"
 
 # init and specify point at their successor from the report step. fix-tests deliberately
 # has no automatic successor — the human decides when to re-run review (Key Rule 8) — so

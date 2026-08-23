@@ -22,6 +22,23 @@ consequences: everything you need comes from disk or from the arguments above, s
 explicitly and never assume prior context; and narrowing only works when the human passes it as
 arguments, so treat an empty input as a full review rather than guessing at an intended scope.
 
+### Codex isolation bridge
+
+Codex currently loads this skill inline even though the frontmatter says `context: fork`. When a
+collaboration tool is available that can spawn a subagent with `fork_turns: "none"`, do not run
+the review in this agent unless its assigned task already contains `KABA_ISOLATED_REVIEWER=1`:
+
+1. Before reading feature or test artifacts, spawn exactly one subagent with `fork_turns: "none"`.
+2. Its task must begin with `KABA_ISOLATED_REVIEWER=1`, forbid further delegation, tell it to read
+   this skill from `$(git config kaba.scriptdir)/../skills/review-tests/SKILL.md`, and pass only the
+   human arguments supplied with this invocation. Do not copy any other conversation content.
+3. Wait for that subagent to finish, relay its final summary, and stop. The parent must not perform
+   any review steps or write `test-review.md` itself.
+
+When the collaboration tool is unavailable, continue here: Claude's native `context: fork` has
+already supplied the isolated context. An agent whose assigned task contains
+`KABA_ISOLATED_REVIEWER=1` is the fresh Codex reviewer and continues below without spawning again.
+
 **Scoped review mode**: If the arguments contain criterion IDs (tokens matching `[A-Z]+-\d+`,
 e.g. `DELETE-004 FMT-008`), enter scoped mode — only the listed criteria are reviewed. All other
 criteria are skipped. Cross-reference each ID against `ACCEPTANCE` to confirm it exists; warn and
