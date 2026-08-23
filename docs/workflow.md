@@ -13,7 +13,7 @@ Standard AI coding agents don't do TDD. When told "use TDD," they write code fir
 ### Key Advantages
 
 1. **Tests are easier to review than code** — especially with shoulda syntax (reads like English). If the tests are correct, the implementation is reviewable by the test suite itself.
-2. **Hooks can't be ignored** — a git pre-commit hook that rejects changes to the test directory during implementation is a guarantee, not a suggestion.
+2. **Mechanical checks catch drift** — git hooks and inline end gates reject boundary violations during the normal verified workflow. They are guardrails for a cooperating agent, not security against a hostile one.
 3. **Test snapshots catch regressions** — by recording which tests are red/green before and after each session, you detect unintended side effects automatically.
 4. **Separation of concerns** — the agent can't write tests that are biased toward its own implementation because it hasn't written the implementation yet.
 5. **Existing tooling handles code quality** — the project's own linter and any suite-embedded checks (e.g. N+1 detection) are pass/fail commands. No need to prompt for these.
@@ -53,7 +53,7 @@ The agent does the typing. The human does the thinking (what to test, what the c
 | 8 | `/kaba:implement-tests` | Agent writes all test code following the test plan. Only test files. | Test files in the configured test directory |
 | 9 | Snapshot: capture post-test | Run test suite, save state to file | `FEATURE_DIR/snapshots/post-test.json` |
 | 10 | Snapshot: compare | Compare post-test vs baseline (see Snapshot Comparison Rules) | Pass/fail report |
-| 11 | Hook: test quality | Automated check — reject if specs use `receive`, `expect_any_instance_of`, `respond_to`, or test private methods | Pass/fail |
+| 11 | Script: banned patterns | Automated scan — reject RSpec message expectations, any-instance mocking/stubbing, and `respond_to` matchers | Pass/fail |
 | 12 | `/kaba:review-tests` | Agent review — "could a terrible implementation pass these tests?" | Structured findings report |
 | 13 | `/kaba:fix-tests` | *(optional — only on a NO-GO verdict)* Apply the review findings to the test files — mechanical fixes directly, escalated findings resolved with the human — then re-validate (snapshot + banned-pattern scan) | Updated test files + `FEATURE_DIR/test-fixes.md` |
 | 14 | Human review | Review test descriptions and agent findings. Final go/no-go. | Go/no-go |
@@ -128,24 +128,25 @@ The snapshot script (`$(git config kaba.scriptdir)/snapshot-tests.sh`) is called
 | `compare post-impl` | `/kaba:implement-code` | End — immediately after post-impl capture |
 | `cleanup-tests.sh` (own script) | Human-triggered, between features | Deletes skip-marked REMOVED tests; self-verifying with rollback |
 
-### What Gets Enforced by Hooks vs. Prompts
+### Mechanical Enforcement vs. Prompt-Held Rules
 
 | Concern | Enforcement | Mechanism |
 |---------|-------------|-----------|
-| No implementation code in test session | Hook | Session lock (`test` mode): PreToolUse guard blocks agent edits to implementation paths in real time; pre-commit rejects staged implementation paths |
-| No test changes in implementation session | Hook | Session lock (`implement` mode): PreToolUse guard blocks agent edits to the test directory in real time; pre-commit rejects staged test paths; test-directory-untouched end gate in `implement-code` |
-| No `receive`/`expect_any_instance_of`/`respond_to` in specs | Script | `$(git config kaba.scriptdir)/banned-patterns.sh`, pass/fail |
-| Snapshot comparison rules | Hook | Snapshot diff script, pass/fail |
-| Linter compliance | Hook | The project's configured `linter_command` (`.kaba/config.yml`), pass/fail |
-| N+1 query detection (if the suite has it, e.g. Prosopite) | Hook | Rides along inside the `test_command` green run, pass/fail |
+| No implementation code in test session | Real-time hook + git boundary | Session lock (`test` mode): PreToolUse guard blocks agent edits to implementation paths in real time; pre-commit rejects staged implementation paths |
+| No test changes in implementation session | Real-time hook + git boundary + inline end gate | Session lock (`implement` mode): PreToolUse guard blocks agent edits to the test directory in real time; pre-commit rejects staged test paths; test-directory-untouched end gate in `implement-code` |
+| No banned RSpec patterns | Inline script gate | `$(git config kaba.scriptdir)/banned-patterns.sh`, pass/fail |
+| Snapshot comparison rules | Inline script gate | `snapshot-tests.sh`, invoked by the owning skill, pass/fail |
+| Linter compliance | Inline command gate | The project's configured `linter_command` (`.kaba/config.yml`), pass/fail |
+| N+1 query detection (if the suite has it, e.g. Prosopite) | Test-suite gate | Rides along inside the `test_command` green run, pass/fail |
 | Test plan criterion coverage | Prompt | Agent follows test plan structure |
 | Code architecture decisions | Prompt | Agent follows implementation plan |
 | Re-run overwrite confirmation | Prompt | `check-artifacts.sh` answers *has this step already completed?*; the command's own step 1 acts on the answer (see **Re-running a step**) |
 
 The overwrite confirmation is the one rule in this table that is prompt-held by necessity rather than
-by choice. Nothing can force the agent to *run* the script, and a `PreToolUse` hook — the mechanism
-used for everything else — fires at write time, which is far too late: the cost being prevented is a
-whole regeneration's worth of analysis, spent before a single byte is written.
+by choice. Nothing can force the agent to *run* the script, and `PreToolUse` does not fire until write
+time. That is too late for this concern: the cost being prevented is a whole regeneration's worth of
+analysis, spent before a single byte is written. The later git and inline gates protect repository
+state, but cannot recover that wasted work.
 
 ### Re-running a step
 
@@ -199,4 +200,4 @@ The two-session boundary is enforced by a lock with one state file and one rule 
 - **SessionStart rewire** (same file): re-points `kaba.scriptdir` at the plugin copy that is actually running. `/kaba:init` pins that path absolutely, and a marketplace install puts the version in it, so every version bump would otherwise strand it — leaving new command text calling scripts out of the old directory. Fails open in any repo without `.kaba/config.yml`, and never pins at a scripts directory that does not exist.
 - **Pre-commit hook** (`.kaba/hooks/pre-commit`, installed into the consumer repo by `/kaba:init`): validates staged paths at the commit boundary via `core.hooksPath`. (`--no-verify` can bypass — guardrail, not security.)
 
-The **guarantee** is the pair of git-based checks — the pre-commit hook and the implementation session's end gates. They inspect the working tree and the index, so they are indifferent to how a change arrived. The PreToolUse guard is real-time feedback layered on top of them, not a substitute.
+The **normal-workflow guarantee** is the pair of git-based checks — the pre-commit hook and the implementation session's end gates. They inspect the working tree and the index, so they are indifferent to how a change arrived. The PreToolUse guard is real-time feedback layered on top of them, not a substitute. These are drift controls for a cooperating agent, not a security boundary against deliberate bypass.
