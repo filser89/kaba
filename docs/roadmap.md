@@ -3,6 +3,8 @@
 Kaba supports Claude Code and has an installable Codex compatibility implementation. This roadmap
 contains only future work; completed user-visible changes are recorded in `CHANGELOG.md`, and the
 Codex mechanism-spike evidence is recorded in `docs/codex-compatibility-spike.md`.
+Active Codex failures, fixes, and release evidence are tracked in
+`docs/codex-release-readiness.md`.
 
 ## Codex release validation
 
