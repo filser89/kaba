@@ -46,7 +46,7 @@ Status values:
 | CODEX-010 | BLOCKER | OPEN | Mid-test criteria removal produces post-test REMOVE identities that cannot validate against the preserved baseline. |
 | CODEX-011 | MEDIUM | OPEN | Scoped review clears findings but retains stale Strength Summary claims that the fixed weaknesses remain. |
 | CODEX-012 | HIGH | OPEN | Scoped adversarial re-review clears a repair that only swaps one trivial passing stub for its symmetric alternative. |
-| CODEX-013 | BLOCKER | OPEN | Full test review accepts service-only coverage for the feature's primary user journey, allowing an unusable implementation to pass. |
+| CODEX-013 | BLOCKER | OPEN | The workflow validates acceptance criteria atomically without checking that they compose into a usable application. |
 | CODEX-014 | HIGH | OPEN | Code planning moves service-owned workflow rules into the model to defend an explicitly unsupported write path. |
 
 ### Required release validations
@@ -983,7 +983,7 @@ Strength Summary explicitly recognizes the non-monotonic timestamp/insertion arr
 
 ---
 
-## CODEX-013 — Full review misses the absent user-facing creation path
+## CODEX-013 — Atomic acceptance coverage permits an unusable application
 
 **Severity:** BLOCKER  
 **Status:** OPEN  
@@ -991,44 +991,41 @@ Strength Summary explicitly recognizes the non-monotonic timestamp/insertion arr
 
 ### Observation
 
-The feature's primary behavior is that a user can capture and save a new experiment. DRAFT-001
-states, “A user can save a new engineering experiment before work begins.” The locked suite maps
-that criterion only to `spec/services/experiments/create_spec.rb`; it has no request or feature
-example for a new/create route, form, submission, or resulting saved experiment.
+The acceptance criteria contain individually correct statements, but the workflow validates them
+as isolated assertions and never checks whether they compose into a complete, usable application
+journey. In Trialbook Feature 001, the final full `$kaba:review-tests` reviewed all 43 criteria,
+returned GO with zero findings, and called draft creation strongly constrained. The resulting
+`code-plan.md` could nevertheless satisfy the approved suite while leaving a user with no usable
+way to create the first experiment.
 
-The final full `$kaba:review-tests` reviewed 43/43 criteria, returned GO with zero findings, and
-called draft creation strongly constrained. The resulting `code-plan.md` demonstrates the surviving
-wrong implementation: it plans `Experiments::Create`, but no controller new/create actions, creation
-form, or new/create routes. All 43 examples can therefore pass while a user opening the application
-has no way to create the first experiment.
+The concrete manifestation was DRAFT-001: “A user can save a new engineering experiment before
+work begins.” It was mapped only to `spec/services/experiments/create_spec.rb`, while the approved
+set contained no connected journey from a reachable application entry point through creation and
+submission to an observable saved result. The missing create route, form, and user entry point were
+symptoms of the larger failure: complete atomic coverage did not establish whole-feature usability.
 
 ### Impact
 
-The full adversarial review can approve a suite that proves an internal operation but not the
-user-visible capability named by the criterion. The implemented feature would be unusable without
-fixtures, console access, or an unplanned interface. A 43/43 GO is not meaningful if it does not
-check that the primary journey is reachable from a real application boundary.
+Kaba can report complete acceptance coverage and a full-review GO even when the covered behaviors
+do not join into an operable user flow. This makes the acceptance count misleading: satisfying
+every approved item is not sufficient evidence that the feature, or the application containing it,
+can actually be used.
 
 ### Required fix
 
-Test planning and review must validate observation-layer alignment, not only whether each criterion
-ID has an assertion. A criterion framed as a user action must be exercised through a user-visible
-boundary unless the specification explicitly defines an API or internal operation as the product
-surface. Full review must also perform cross-criterion reachability analysis: the suite should prove
-that a user can enter, complete, and observe the feature's primary journey, rather than accepting
-isolated lower-layer operations as a substitute.
+The workflow must be able to reject a set of acceptance criteria and tests that is atomically
+complete but does not cover a usable application. The exact mechanism is not decided in this
+failure record.
 
 ### Closure criteria
 
-- [ ] A test plan mapping “a user can create/save” only to a service example receives NO-GO.
-- [ ] Trialbook DRAFT-001 includes a Rack::Test journey or equivalent approved application-boundary
-  test that opens the creation surface, submits a title, and observes the persisted experiment.
-- [ ] Review checks that every primary user journey has an entry point and observable completion.
-- [ ] Lower-layer service coverage remains available without being treated as sufficient journey
+- [ ] The original 43-criterion Trialbook set is rejected despite every criterion having mapped
   coverage.
-- [ ] The amended suite fails an implementation containing `Experiments::Create` but no creation
-  controller, route, or form.
-- [ ] A fresh full isolated review catches the original weak suite and returns GO after repair.
+- [ ] The rejection identifies that the covered statements do not compose into a usable creation
+  journey.
+- [ ] A suite cannot receive GO solely because every atomic criterion has a passing test.
+- [ ] A fresh validation accepts the corrected Trialbook feature only when its primary capability
+  is usable as a connected whole.
 
 ### Resolution evidence
 
