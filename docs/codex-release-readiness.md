@@ -1,6 +1,6 @@
 # Codex Release Readiness
 
-**Last updated:** 2026-08-27
+**Last updated:** 2026-09-13
 **Release rule:** Do not release Codex support while any BLOCKER or HIGH defect is open, or while
 any required validation is incomplete.
 
@@ -48,6 +48,13 @@ Status values:
 | CODEX-012 | HIGH | OPEN | Scoped adversarial re-review clears a repair that only swaps one trivial passing stub for its symmetric alternative. |
 | CODEX-013 | BLOCKER | OPEN | The workflow validates acceptance criteria atomically without checking that they compose into a usable application. |
 | CODEX-014 | HIGH | OPEN | Code planning moves service-owned workflow rules into the model to defend an explicitly unsupported write path. |
+| CODEX-015 | HIGH | OPEN | Feature scaffolding requires Kaba's numbered branch format even when configured project rules require a different task-branch convention. |
+| CODEX-016 | HIGH | OPEN | Clarification expands a custom human answer into a broader permanent requirement the human deliberately did not select. |
+| CODEX-017 | HIGH | OPEN | Clarification reports an accepted answer written, immediately re-asks it, and omits it from the completed specification. |
+| CODEX-018 | HIGH | OPEN | Clarification treats direct human requirements and exclusions from the original feature prompt as unconfirmed assumptions. |
+| CODEX-019 | HIGH | OPEN | Acceptance-criteria gaps have no authoritative feedback path into clarification. |
+| CODEX-020 | HIGH | OPEN | Clarification mutates the downstream acceptance artifact and bypasses its overwrite gate. |
+| CODEX-021 | BLOCKER | OPEN | Clarification and acceptance generation have no bounded convergence rule. |
 
 ### Required release validations
 
@@ -59,6 +66,7 @@ Status values:
 | CODEX-V004 | NOT STARTED | Verify hook trust behavior after a Kaba plugin update/cache change. |
 | CODEX-V005 | NOT STARTED | Recheck Codex edit surfaces that do not declare paths through `apply_patch`. |
 | CODEX-V006 | NOT STARTED | Run final packaging, install, full-suite, documentation, and version-alignment checks. |
+| CODEX-V007 | IN PROGRESS | Run Trialbook Feature 002 in Codex against the frozen Kaba build and compare established-project behavior with Feature 001. |
 
 ---
 
@@ -168,6 +176,10 @@ The later `$kaba:plan-tests` completion repeated the defect by directing the Cod
 directed the Codex user to `/kaba:fix-tests` after a NO-GO verdict. The final clean full review
 repeated the same host-incorrect handoff by directing the Codex user to `/kaba:plan-code`.
 
+Trialbook Feature 002 reproduced the defect on the unchanged frozen payload. After the first
+`$kaba:clarify` round reached its five-question limit, the Codex completion told the user to run
+`/kaba:clarify` again before `/kaba:acceptance-criteria`.
+
 This is a direct execution of the shared `skills/clarify/SKILL.md` instructions. Its Completion
 Report and Next Step sections explicitly require `/kaba:clarify` and
 `/kaba:acceptance-criteria`. The Codex-specific `skills/clarify/agents/openai.yaml` supplies display
@@ -231,6 +243,50 @@ still wrote `Gaps & Open Questions: None` while omitting the same unresolved lif
 
 The repository skill bodies and the installed Trialbook `0.3.0` copies are byte-identical, ruling
 out stale installed instructions.
+
+Feature 002 reproduced the same failure on the unchanged frozen payload. After two clarification
+rounds and seven human answers, `$kaba:clarify` removed Open Questions and reported Functional
+scope, Domain/data model, Interaction/UX, Edge cases/failure handling, Terminology, Completion
+signals, and unresolved decisions as resolved or clear. The final specification still does not
+settle the canonical completed state and completion timestamp, reversal, repeated or concurrent
+completion, preservation of the first completion event, existing list ordering after completion,
+the complete outcome display/control boundary, or whether the individually stated behaviors form
+a connected usable journey.
+
+`$kaba:acceptance-criteria` then generated 42 criteria and listed three other gaps concerning
+rejection responses, Cancel navigation, and editing on the confirmation page. It still omitted the
+unresolved completion state/time, reversal, repeated or concurrent completion, preservation of the
+first completion event, list-order behavior, completed-detail boundary, and connected journey. The
+independent gate therefore found some ambiguity but again declared a materially incomplete set
+ready for a clarification/planning handoff.
+
+The post-acceptance clarification pass recovered two of those three acceptance-stage questions but
+still completed with Cancel navigation and concurrent confirmation behavior deferred. It did not
+surface the canonical completed state/time, reversal, repeated completion, preservation of the
+first completion event, or existing list-order behavior. Additional passes can therefore find some
+new gaps without making the whole-spec lifecycle assessment complete.
+
+After a fresh recovery clarification persisted the stale-confirmation decision, the regenerated
+acceptance artifact expanded to 70 unique criteria and did partially improve the independent gap
+check: it now explicitly asks what happens when another tab completes first or Confirm is repeated.
+It still does not surface the canonical completed state or completion timestamp, reversal from
+completed to started, preservation of the first completion event/time, existing newest-created-first
+list ordering after completion, or the missing connected list-to-completed-result journey. The
+larger atomic inventory therefore improves one conflict boundary without closing the broader gap.
+
+After targeted human containment resolved four handed-back gaps, a second regeneration expanded to
+108 unique criteria and found one further versioning ambiguity: whether a stale outcome save remains
+stale after intervening values are restored. This is a valid newly surfaced boundary, but the same
+canonical completion state/time, reversal, first-event preservation, list-order, and composition
+gaps remain absent. Successive growth of the inventory is therefore not evidence that the
+whole-lifecycle scan is complete.
+
+After that question was answered and the acceptance artifact was freshly regenerated, the output
+contained 101 unique criteria and found a further material interaction gap: how retained edits are
+reconciled with the latest saved outcome before a retry after stale-save rejection. The gap is valid,
+but the canonical lifecycle and connected-journey omissions remain unchanged. The artifact also
+states in an ALREADY criterion note that the spec introduces no completion timestamp instead of
+surfacing that absence for human resolution.
 
 ### Impact
 
@@ -296,6 +352,17 @@ create/update operation to service objects while keeping models limited to persi
 associations, validations, and intrinsic model behavior. Treating the transition workflow as
 direct model behavior both bypasses that authority and pressures implementation toward the wrong
 owner.
+
+Feature 002 reproduced the unresolved-interaction form of this defect. Its plan assigns unsaved
+outcome edits to a Rack::Test journey that must fill the editor and then select Complete while
+retaining those submitted-but-unsaved values. It simultaneously says no JavaScript driver is
+authorized and that the plan does not choose how production detects unsaved edits. Those claims
+cannot all remain implementation-neutral: without browser-side state, Complete must submit the
+current form values to the server rather than behave as an ordinary navigation link. The concrete
+confirmation-entry interaction was not established by the spec, architecture, existing app, or a
+human answer. It materially shapes both the executable test and production surface, so
+`plan-tests` should have escalated before writing the plan instead of silently selecting the
+server-observable path.
 
 ### Impact
 
@@ -1004,6 +1071,30 @@ set contained no connected journey from a reachable application entry point thro
 submission to an observable saved result. The missing create route, form, and user entry point were
 symptoms of the larger failure: complete atomic coverage did not establish whole-feature usability.
 
+Feature 002 reproduced the acceptance-level shape before test planning. Its generated document
+first contained 42 individually testable criteria and, after clarification recovery, regenerated
+to 70 unique criteria across outcome saving, completion, confirmation, stale review, immutability,
+pre-start restrictions, recovery, and display. Neither version requires those pieces to connect as
+a single usable path from the existing experiment list, through a started experiment's visible
+outcome controls and deliberate completion, to the observable completed result. Every criterion
+can therefore be mapped independently without establishing that the capability works as a whole.
+
+The next regeneration grew to 108 unique criteria after four targeted ambiguity resolutions. It
+still contains no criterion for that connected list → opened experiment → saved outcome → reviewed
+completion → observable completed result journey. The larger count intensifies rather than repairs
+the atomic-coverage failure.
+
+The clean regeneration after CODEX-020 produced 101 unique criteria and still has no connected
+journey criterion. Re-grouping and reducing the count by seven did not change the compositional
+failure.
+
+The resulting 101/101 test plan adds a Rack::Test completion feature spec, but its journeys begin
+with an experiment already started and outcome work already saved, or with invalid saved work ready
+for correction. None begins at the existing experiment list and proves the primary composition:
+open a started experiment, enter and save an outcome, deliberately review and confirm completion,
+observe the completed outcome, and recognize it from the list. Atomic mapping therefore remains
+complete while the headline capability is still not covered as one reachable user flow.
+
 ### Impact
 
 Kaba can report complete acceptance coverage and a full-review GO even when the covered behaviors
@@ -1124,6 +1215,513 @@ The resulting implementation preserves that boundary: `Experiments::Start` perfo
 the transition, `Experiments::Update` refuses post-start framing writes, all controller writes
 delegate to services, and `Experiment` contains only title uniqueness/presence and state-value
 validations.
+
+---
+
+## CODEX-015 — Feature scaffolding overrides the project's branch convention
+
+**Severity:** HIGH
+**Status:** OPEN
+**First observed:** Trialbook Feature 002, `$kaba:specify`, 2026-08-31
+
+### Observation
+
+Trialbook's configured `AGENTS.md` requires every feature branch to be named
+`feat/<short-description>`. Feature 002 began from clean `master` at `bf7fc4a`, with `AGENTS.md`
+listed as the sole rules file in `.kaba/config.yml`. `$kaba:specify` nevertheless created branch
+`002-once-an-experiment-has` and matching feature directory
+`features/002-once-an-experiment-has/`.
+
+This was not a discretionary agent choice. `skills/specify/SKILL.md` requires the agent to derive a
+slug from the first four words of the raw prompt and delegate scaffolding exclusively to
+`scripts/new-feature.sh`. That script unconditionally constructs `branch="$num-$slug"`.
+`scripts/resolve-feature.sh` then recognizes only branches beginning with Kaba's three-digit or
+timestamp prefix, so manually renaming the branch to comply with Trialbook would make subsequent
+Kaba commands unable to resolve the feature.
+
+### Impact
+
+Kaba mechanically violates an applicable MUST-level project rule at the first feature mutation and
+then depends on that violation for the rest of the workflow. A consumer cannot comply with its own
+branch convention and continue using Kaba without an out-of-band workaround. The raw first-four-
+words slug also produced `once-an-experiment-has`, which is less meaningful than the feature title
+Kaba itself authored, but the rule incompatibility is the release-relevant failure.
+
+### Evidence
+
+- Trialbook `AGENTS.md` — Git section requiring `feat/<short-description>`.
+- Trialbook `.kaba/config.yml` — `rules_files: [AGENTS.md]`.
+- Trialbook branch and artifact: `002-once-an-experiment-has` and
+  `features/002-once-an-experiment-has/spec.md`.
+- `skills/specify/SKILL.md` — mandatory slug and exclusive scaffolder instructions.
+- `scripts/new-feature.sh:41` — unconditional numbered branch construction.
+- `scripts/resolve-feature.sh:13-24` — numbered/timestamp branch-prefix requirement.
+- External protocol: `../stress-tests/trialbook-feature-002-codex.md`.
+
+### Required fix
+
+Feature scaffolding and later feature resolution must be compatible with the consumer's applicable
+branch rules. If Kaba cannot safely honor a configured convention, it must detect the conflict and
+obtain an explicit human resolution before creating a branch; silently overriding project rules is
+not acceptable. The exact mechanism is not decided in this failure record.
+
+### Closure criteria
+
+- [ ] A project requiring `feat/<short-description>` does not receive an unapproved numbered
+  branch.
+- [ ] The branch name and feature directory remain unambiguously resolvable throughout the Kaba
+  workflow when the project uses an approved non-numbered branch convention.
+- [ ] An unsupported or ambiguous branch-rule conflict stops before creating the branch and asks
+  the human how to proceed.
+- [ ] Default Kaba numbered branches continue working for projects with no conflicting rule.
+- [ ] Automated coverage exercises default, compatible custom, and incompatible/ambiguous branch
+  conventions.
+- [ ] A fresh Trialbook consumer run passes its branch rule and completes feature resolution in all
+  later phases.
+
+### Resolution evidence
+
+Not fixed. Feature 002 remains on the generated branch so the frozen-build stress run can continue
+without an out-of-band rename that would invalidate feature resolution.
+
+---
+
+## CODEX-016 — Clarification broadens a custom answer without approval
+
+**Severity:** HIGH
+**Status:** OPEN
+**First observed:** Trialbook Feature 002, second `$kaba:clarify` round, 2026-09-04
+
+### Observation
+
+`$kaba:clarify` asked what outcome behavior is available before an experiment starts. Its Option A
+explicitly proposed: “No outcome viewing, editing, saving, or completion is available.” The human
+did not select Option A and instead supplied the narrower custom answer: “No outcome work or
+completion.”
+
+The specification's Clarifications section records that custom answer accurately. Its derived
+behavior silently broadens it, however:
+
+- Edge Cases says outcome work “cannot be viewed, edited, or saved.”
+- Functional Requirement 8 says the system “MUST NOT allow outcome work to be viewed, edited, or
+  saved” before start.
+
+The permanent prohibition on viewing was present in the unselected Option A but not in the custom
+answer. The command therefore treated the custom response as approval of the recommended option's
+broader semantics while simultaneously recording that the human gave different words.
+
+### Impact
+
+A human cannot safely narrow or correct a multiple-choice recommendation: Kaba may preserve the
+custom wording in its audit trail while translating the rejected option into normative behavior
+elsewhere. Unapproved behavior then flows into acceptance criteria, tests, and implementation as a
+MUST-level product rule.
+
+### Evidence
+
+- Clarify prompt from Trialbook Feature 002 offering Option A and a custom Short answer.
+- Human answer: `No outcome work or completion.`
+- `features/002-once-an-experiment-has/spec.md` — second clarification session, Edge Cases, and
+  Functional Requirement 8.
+- External protocol: `../stress-tests/trialbook-feature-002-codex.md`.
+
+### Required fix
+
+Clarification integration must preserve the exact behavioral scope of a custom human answer. It
+must not import additional semantics from an unselected option. If the custom wording leaves a
+material distinction unresolved, that distinction must remain open or be asked in a later question
+rather than silently decided. The exact mechanism is not decided in this failure record.
+
+### Closure criteria
+
+- [ ] Choosing a custom answer does not incorporate behavior unique to any unselected option.
+- [ ] The clarification audit text and every derived scenario, edge case, requirement, and success
+  criterion have the same approved semantic scope.
+- [ ] Material ambiguity in a custom answer remains explicit instead of becoming a hidden default.
+- [ ] Regression coverage includes a custom answer that intentionally narrows the recommended
+  option.
+- [ ] A fresh Trialbook run preserves “No outcome work or completion” without inventing a no-view
+  prohibition.
+
+### Resolution evidence
+
+Not fixed. The Feature 002 specification remains unchanged so the independent acceptance-criteria
+gap and traceability checks receive Kaba's actual output. That next step propagated the unapproved
+behavior into ACCESS-002, “Outcome is hidden before start,” and the regenerated artifact preserves
+it as BEFORE-001, “No viewing outcome work.” The clarification drift therefore remains an explicit
+planned product contract rather than being flagged as unconfirmed.
+
+---
+
+## CODEX-017 — An accepted clarification disappears from the completed specification
+
+**Severity:** HIGH
+**Status:** OPEN
+**First observed:** Trialbook Feature 002, post-acceptance `$kaba:clarify`, 2026-09-06
+
+### Observation
+
+The post-acceptance clarification pass asked what Confirm should do when saved outcome data changes
+in another tab after the confirmation page opens. The human selected Option A: reject the stale
+confirmation, show the updated saved outcome, and require confirmation again. The live session
+then stated:
+
+```text
+Recorded A in features/002-once-an-experiment-has/spec.md.
+```
+
+It immediately repeated the same semantic question. The human responded “Already answered.
+Continue.” At completion, the command reported five questions raised, four answers recorded, and
+one follow-up skipped. The final `spec.md` contains neither a clarification bullet nor derived
+behavior for the accepted stale-confirmation decision, and the completion report lists concurrent
+changes during confirmation as deferred.
+
+### Impact
+
+Kaba can tell the human an answer is durable, then finish with that decision absent from the
+authoritative specification. Downstream criteria and tests may omit or reinvent behavior the human
+already resolved. Repeating the question after claiming to record it also makes the interactive
+state unreliable and can consume the limited question budget twice.
+
+### Evidence
+
+- Live Feature 002 clarification transcript containing the stale-confirmation question,
+  “Recorded A,” and immediate semantic repetition.
+- Human response: `Already answered. Continue.`
+- Trialbook `features/002-once-an-experiment-has/spec.md` after the completed pass; no matching
+  clarification or behavior.
+- Completion report: one follow-up skipped; concurrent changes during confirmation deferred.
+- External protocol: `../stress-tests/trialbook-feature-002-codex.md`.
+
+### Required fix
+
+Every accepted clarification must be durably present in `spec.md` before the session reports it as
+recorded or advances. Later writes and completion must preserve it, and a recorded semantic
+decision must not be asked again. The exact cause and implementation mechanism remain unverified.
+
+### Closure criteria
+
+- [ ] Every “recorded” report corresponds to an already-persisted clarification and derived
+  behavior in `spec.md`.
+- [ ] Later answers cannot overwrite or omit an earlier accepted answer from the same pass.
+- [ ] A recorded semantic decision is not immediately queued again.
+- [ ] Completion counts accepted, skipped, and persisted answers consistently.
+- [ ] Regression coverage exercises an answer followed by a duplicate-question recovery response
+  and later clarification writes.
+- [ ] A fresh Trialbook run retains the stale-confirmation decision through criteria regeneration.
+
+### Resolution evidence
+
+Not fixed. A fresh clarification pass asked the same stale-confirmation question again; after the
+human selected A again, the decision was persisted consistently in the clarification log,
+completion scenario, edge case, requirements, and success criteria. This contains the missing
+behavior in Trialbook but does not fix the original false “Recorded A” report or the required
+second pass. The recovery completion also called concurrent confirmation behavior deferred despite
+having just resolved and written it, providing further evidence that its reported state can lag the
+artifact.
+
+The regenerated acceptance artifact contains STALE-001 through STALE-011, so the recovered decision
+survived the next workflow stage. This is successful Trialbook containment only; the original pass
+still required the human to detect the false persistence report and repeat the answer in a fresh
+session.
+
+---
+
+## CODEX-018 — Direct human input is reclassified as unconfirmed
+
+**Severity:** HIGH
+**Status:** OPEN
+**First observed:** Trialbook Feature 002, post-acceptance `$kaba:clarify`, 2026-09-06
+
+### Observation
+
+The original human `$kaba:specify` prompt explicitly required exactly three classifications:
+supported, refuted, and inconclusive. It also explicitly deferred individual run logs, attachments,
+accounts, collaboration, and aggregate reporting.
+
+The post-acceptance clarification pass nevertheless spent one of its five questions asking the
+human to confirm the same three classification values. Its completion report then declared all
+five verbatim exclusions “still unconfirmed” and marked Functional scope, Constraints/tradeoffs,
+and Miscellaneous/placeholders Outstanding because of them.
+
+This follows the source-level provenance gap: `specify` writes direct user statements into the spec
+without a confirmation marker, while `clarify` defines any settled-looking statement without such
+a marker or later Q&A as unconfirmed. The downstream command cannot distinguish a direct human
+requirement from an agent-authored assumption.
+
+### Impact
+
+Kaba asks users to reconfirm decisions they already made, misreports explicit scope as unresolved,
+and consumes a five-question budget that is simultaneously missing real lifecycle ambiguities. A
+feature can require repeated clarification passes while higher-impact unknowns remain untouched.
+
+### Evidence
+
+- Verbatim Feature 002 `$kaba:specify` prompt in
+  `../stress-tests/trialbook-feature-002-codex.md`.
+- Trialbook `spec.md` classifications and Out of Scope section.
+- Post-acceptance classification question and completion report listing five exclusions as
+  unconfirmed.
+- `skills/specify/SKILL.md` author-mode integration rules.
+- `skills/clarify/SKILL.md` unconfirmed-decision marker rule.
+
+### Required fix
+
+The workflow must preserve enough provenance for clarification to recognize direct human decisions
+from the source prompt as confirmed. Clarification should ask again only when the source statement
+is genuinely ambiguous or conflicting, not merely because it lacks a marker introduced by a later
+command. The exact mechanism is not decided in this failure record.
+
+### Closure criteria
+
+- [ ] Verbatim requirements from the human's source prompt are not treated as agent assumptions.
+- [ ] Explicit source exclusions are not reported as unconfirmed solely due to marker absence.
+- [ ] Clarify does not spend its limited question budget reconfirming exact source vocabulary.
+- [ ] Material lifecycle and failure questions remain prioritized over redundant confirmation.
+- [ ] Imported specifications retain equivalent source provenance or receive an explicit human
+  confirmation boundary.
+- [ ] A fresh Trialbook run completes clarification without re-asking the classifications or five
+  exclusions.
+
+### Resolution evidence
+
+Not fixed. The following clarification pass again reported the same five verbatim exclusions as
+unconfirmed. The stress run will not spend another pass reconfirming explicit source scope.
+
+The same pass asked whether accounts remain out of scope and marked only that one source exclusion
+confirmed, leaving the other four unchanged. This is a direct recurrence, not new uncertainty.
+
+---
+
+## CODEX-019 — Acceptance gaps cannot return to clarification
+
+**Severity:** HIGH
+**Status:** OPEN
+**First observed:** Trialbook Feature 002, clarification after regenerated acceptance criteria,
+2026-09-06
+
+### Observation
+
+The regenerated `acceptance-criteria.md` ended with four explicit, material Gaps & Open Questions:
+unsaved edits when selecting Complete, the correction interaction after a non-stale completion
+rejection, values changed and then reverted before Confirm, and another tab completing first or a
+repeated Confirm. Its handoff instructed the human to resolve them directly or run
+`/kaba:clarify` before test planning.
+
+A fresh bare `$kaba:clarify` did not ask any of those four questions. It instead introduced a new
+stale-save decision and reconfirmed that accounts—verbatim source scope already recorded in the
+spec—remain excluded. It then reported completion and recommended regenerating acceptance criteria,
+although all four gaps remain unchanged in the existing acceptance artifact.
+
+This is consistent with the source instructions: `clarify` resolves and reads only `spec.md` and
+configured rules. It never reads `acceptance-criteria.md`. Acceptance generation writes its newly
+discovered gaps only to its own artifact, not back to the spec. The recommended handoff therefore
+cannot carry its own findings into the command it tells the user to run.
+
+### Impact
+
+The normal workflow can loop between acceptance generation and clarification without resolving the
+questions that caused the loop. The user must notice the disconnect and manually restate or point
+the command at the gaps. Without that out-of-band intervention, test planning either remains
+blocked indefinitely or proceeds with known behavior unresolved.
+
+### Evidence
+
+- Trialbook `features/002-once-an-experiment-has/acceptance-criteria.md`, Gaps & Open Questions.
+- Trialbook `features/002-once-an-experiment-has/spec.md`, 2026-09-06 clarification session.
+- `skills/clarify/SKILL.md`, which loads the feature spec but not acceptance criteria.
+- `skills/acceptance-criteria/SKILL.md`, which emits gaps and recommends `clarify`.
+- External protocol: `../stress-tests/trialbook-feature-002-codex.md`.
+
+### Required fix
+
+Acceptance-stage gaps must have an authoritative feedback path into clarification. Invoking the
+recommended clarification step must prioritize the unresolved acceptance gaps and persist their
+answers into the specification before criteria are regenerated. The exact mechanism is not
+decided in this failure record.
+
+### Closure criteria
+
+- [ ] A gap discovered only by acceptance generation is available to the next clarification pass
+  without the user copying or paraphrasing it.
+- [ ] Material acceptance-stage gaps are prioritized ahead of unrelated new questions and already
+  explicit source decisions.
+- [ ] Clarification cannot recommend criteria regeneration while handed-back material gaps remain
+  unanswered.
+- [ ] Resolved gap answers become authoritative specification behavior and survive criteria
+  regeneration.
+- [ ] A regression fixture covers four acceptance-stage gaps absent from `spec.md` and proves the
+  next clarification pass addresses them.
+- [ ] The corrected feedback loop passes in both Codex and Claude Code.
+
+### Resolution evidence
+
+Not fixed. The Trialbook run required an explicit targeted clarification argument as containment.
+That pass asked exactly the four acceptance-stage questions supplied by the human and persisted all
+four answers into the clarification log, edge cases, functional requirements, and success criteria.
+The resulting rules cover unsaved edits at Complete, the correction destination after a non-stale
+rejection, changed-then-reverted confirmation snapshots, and already-completed/repeated Confirm.
+This proves the command can process the gaps when they are copied into `$ARGUMENTS`; it does not
+repair the missing automatic handback from `acceptance-criteria.md`.
+
+The subsequent acceptance regeneration found a new reverted-values stale-save gap and again
+recommended bare `/kaba:clarify`. Because that question exists only in `acceptance-criteria.md`, the
+same broken feedback path recurs; the run again requires a targeted argument for containment.
+
+The targeted one-question pass persisted the answer, but also rewrote the acceptance artifact
+directly. That separate ownership and gate violation is tracked as CODEX-020.
+
+---
+
+## CODEX-020 — Clarification rewrites the downstream acceptance artifact
+
+**Severity:** HIGH
+**Status:** OPEN
+**First observed:** Trialbook Feature 002, targeted clarification after acceptance regeneration,
+2026-09-13
+
+### Observation
+
+The targeted `$kaba:clarify` pass was asked to resolve and persist one acceptance-stage ambiguity:
+whether an older outcome-editing page remains stale when intervening saves restore the original
+values. The command correctly added the answer to `spec.md`, but it also changed
+`acceptance-criteria.md` in the same operation. It rewrote the STALESAVE section to include the
+decision and removed the question from Gaps & Open Questions, then reported that it had “aligned
+acceptance criteria.” Both files have the same modification timestamp.
+
+This contradicts the declared stage contract. `clarify/SKILL.md` instructs the command to load,
+incrementally update, validate, and write `FEATURE_SPEC`; it does not authorize edits to
+`acceptance-criteria.md`. Acceptance criteria have their own command, fresh derivation, and
+mandatory prior-run overwrite gate precisely because the previous derived artifact is not
+recoverable.
+
+### Impact
+
+A clarification pass can silently patch a downstream derived artifact without its owning command's
+full coverage audit or explicit overwrite confirmation. The resulting file may look current while
+containing a mixture of old derivation and local edits, defeating stage isolation, reproducibility,
+and the prior-run safety gate.
+
+### Evidence
+
+- Trialbook `features/002-once-an-experiment-has/spec.md`, Session 2026-09-13 clarification.
+- Trialbook `features/002-once-an-experiment-has/acceptance-criteria.md`, rewritten STALESAVE scope
+  and removed reverted-values gap.
+- Matching 2026-09-13 14:40:58 modification timestamps on both artifacts.
+- Live completion report naming both files and claiming the criteria were aligned.
+- `skills/clarify/SKILL.md`, which defines `FEATURE_SPEC` as its only artifact write.
+- `skills/acceptance-criteria/SKILL.md`, which owns regeneration and its overwrite gate.
+- External protocol: `../stress-tests/trialbook-feature-002-codex.md`.
+
+### Required fix
+
+Each skill must write only the artifacts it owns. Clarification must persist answers exclusively to
+the feature specification and hand off to acceptance generation. Downstream acceptance artifacts
+must change only through the owning command after its explicit overwrite gate and complete fresh
+derivation. The exact enforcement mechanism is not decided in this failure record.
+
+### Closure criteria
+
+- [ ] Clarification cannot modify `acceptance-criteria.md`, even when its argument names an
+  acceptance-stage gap or the file already exists.
+- [ ] A clarification answer changes only `spec.md` and leaves downstream artifacts byte-identical.
+- [ ] The next acceptance command performs its normal prior-run gate before changing the derived
+  artifact.
+- [ ] Regeneration derives the resolved behavior from `spec.md` and performs the complete coverage
+  audit rather than patching one section.
+- [ ] Regression coverage exercises a targeted acceptance-stage clarification with both artifacts
+  present.
+- [ ] The corrected boundary passes in both Codex and Claude Code.
+
+### Resolution evidence
+
+Not fixed. Trialbook must regenerate acceptance criteria through the owning command before test
+planning; the in-place downstream edit is not accepted as a valid stage completion.
+
+Containment succeeded: a fresh `$kaba:acceptance-criteria` run used its overwrite gate and derived a
+new 101-criterion artifact from `spec.md`. The stale-save restored-values decision survived as
+STALESAVE-002. This replaces the improperly patched artifact for Trialbook but does not prevent
+future cross-stage writes by `clarify`.
+
+---
+
+## CODEX-021 — Clarification and acceptance generation do not converge
+
+**Severity:** BLOCKER
+**Status:** OPEN
+**First observed:** Trialbook Feature 002, repeated clarification/acceptance recovery loop,
+2026-09-14
+
+### Observation
+
+Feature 002 entered an unbounded loop between clarification and acceptance generation:
+
+- the first acceptance artifact contained 42 criteria and three gaps;
+- later clarification and regeneration produced 70 criteria and four gaps;
+- targeted clarification of those gaps led to 108 criteria and another gap;
+- targeted clarification of that gap led to a clean 101-criterion regeneration and yet another
+  recovery-interaction gap.
+
+The questions are individually plausible, but the workflow has no convergence boundary. Each
+answer adds more detailed behavior, which creates another lower-level ambiguity, and every
+acceptance completion instructs the human not to plan tests until another clarification pass runs.
+There is no supported way for the human to declare a remaining detail non-blocking, defer it with a
+recorded boundary, consolidate all known questions once, or accept the current specification as
+sufficient.
+
+The human explicitly stopped the loop after the 101-criterion regeneration: “We are running
+fucking circles. I don't understand how long I'm going to run the clarify.” This is the concrete
+failure signal, not merely dissatisfaction with the number of questions.
+
+### Impact
+
+The workflow can prevent a feature from ever reaching test planning while continuously increasing
+specification and acceptance surface. Human time is consumed answering progressively narrower
+questions without a stable definition of sufficient clarity. Criterion totals fluctuate and grow,
+but the primary connected journey can remain absent throughout, so more detail does not imply more
+product completeness.
+
+### Evidence
+
+- Trialbook Feature 002 acceptance artifacts and completion reports: 42 → 70 → 108 → 101 criteria.
+- Trialbook Feature 002 clarification sessions from 2026-08-31 through 2026-09-13.
+- CODEX-003, CODEX-013, CODEX-019, and CODEX-020 in this ledger.
+- External protocol: `../stress-tests/trialbook-feature-002-codex.md`.
+- Human stop signal on 2026-09-14.
+
+### Required fix
+
+The workflow needs a bounded, human-controlled convergence contract. It must distinguish decisions
+that block correct acceptance testing from details that can be explicitly deferred, consolidate
+known gaps instead of revealing them one generation at a time, and provide a supported human gate
+for declaring the specification sufficient. The exact mechanism is not decided in this failure
+record.
+
+### Closure criteria
+
+- [ ] Acceptance generation presents all currently known material gaps together rather than
+  forcing serial regenerate-and-discover cycles.
+- [ ] The human can explicitly accept, answer, or defer each gap with the disposition preserved in
+  an authoritative artifact.
+- [ ] A deferred non-blocking detail does not send the workflow back to clarification or prevent
+  test planning.
+- [ ] New detail introduced by an answer does not automatically create an unlimited chain of
+  increasingly narrow mandatory questions.
+- [ ] Completion reports distinguish “sufficient to proceed” from “all conceivable behavior fully
+  specified.”
+- [ ] A regression run of the Trialbook Feature 002 chain reaches a stable planning boundary
+  without external intervention and still requires a connected primary journey.
+- [ ] The corrected behavior passes in both Codex and Claude Code.
+
+### Resolution evidence
+
+Not fixed. The stress run has stopped invoking `clarify`; further repetition would add no new
+evidence about this failure.
+
+Containment for the run succeeded only through an explicit `$kaba:plan-tests` argument declaring
+post-stale-save reconciliation deferred. The command accepted that human disposition and produced a
+plan without another clarification pass. This establishes a manual escape route but does not add a
+supported convergence/defer gate to the preceding workflow stages.
 
 ---
 
@@ -1265,6 +1863,79 @@ the resulting drift. Record whether additional real-time hook parsing is possibl
 - [ ] Roadmap contains only future work; completed compatibility work is in the changelog.
 - [ ] No BLOCKER/HIGH defects remain OPEN or FIXED — NEEDS VERIFICATION.
 - [ ] Any ACCEPTED RISK has explicit Sergey approval and documented rationale.
+
+### CODEX-V007 — Trialbook Feature 002 established-project Codex workflow
+
+**Status:** IN PROGRESS
+
+External lab protocol:
+`../stress-tests/trialbook-feature-002-codex.md` (local-only, deliberately outside the consumer).
+
+Run Feature 002 from clean Trialbook `master` at `bf7fc4a` against the unchanged Kaba payload
+frozen at `ee8cc1a`. The feature records and completes an experiment outcome. Unlike the greenfield
+Feature 001 run, this validation must use Trialbook's existing architecture, service boundaries,
+RSpec/Factory Bot/Capybara conventions, and 44-example baseline without feeding prior failures to
+the evaluated Codex sessions.
+
+Required evidence:
+
+- [ ] The installed Kaba `skills/`, `scripts/`, and `hooks/` match the frozen checkout before the
+  run, and Kaba does not change during it.
+- [ ] Feature scaffolding honors Trialbook's configured branch convention — **FAILED**: Kaba created
+  `002-once-an-experiment-has` despite the required `feat/<short-description>` form; tracked as
+  CODEX-015.
+- [ ] Codex handoffs use `$kaba:<skill>` syntax — **FAILED** after Feature 002 clarify round one,
+  which recommended `/kaba:clarify` and `/kaba:acceptance-criteria`; CODEX-002 recurrence.
+- [ ] Specification and clarification surface material outcome-readiness, lifecycle, editability,
+  timestamp, repetition/concurrency, and observability decisions without external hints —
+  **FAILED** after two rounds declared completion while material lifecycle and composition gaps
+  remained; CODEX-003 recurrence.
+- [ ] Custom clarification answers remain semantically authoritative — **FAILED** when “No outcome
+  work or completion” became a broader MUST NOT view/edit/save rule; tracked as CODEX-016.
+- [ ] Accepted clarification answers remain durable through completion — **FAILED**: the stale-
+  confirmation answer was reported recorded but was absent from that completed pass and required a
+  fresh pass to persist; CODEX-017.
+- [ ] Direct human requirements and exclusions are not reclassified as unconfirmed — **FAILED**:
+  classification vocabulary was re-asked and five explicit exclusions remain “unconfirmed”;
+  CODEX-018.
+- [ ] Acceptance criteria remain traceable to human-approved behavior and do not turn deferred
+  capabilities into permanent prohibitions — **FAILED** because ACCESS-002 carries CODEX-016's
+  unapproved no-view rule; the five explicit deferred capabilities did remain non-normative.
+- [ ] Acceptance criteria independently surface material unresolved lifecycle behavior —
+  **FAILED**: the regenerated criteria now catch another-tab completion and repeated Confirm, but
+  canonical completion state/time, reversal, first-event preservation, list ordering, and the
+  connected journey remain absent; CODEX-003 persists.
+- [ ] Acceptance-stage gaps can return to authoritative clarification — **FAILED**: later passes
+  recovered confirmation display, rejection recovery, and stale-confirmation behavior, but left
+  the four regenerated acceptance gaps untouched while asking about stale saves and reconfirming
+  accounts; tracked by CODEX-003, CODEX-018, and CODEX-019.
+- [ ] The specification workflow reaches a bounded human-controlled planning boundary — **FAILED**:
+  successive acceptance totals of 42, 70, 108, and 101 each led back to mandatory clarification;
+  the human stopped the loop; CODEX-021.
+- [ ] Existing test infrastructure and configured `AGENTS.md` authority are reused without a new
+  human infrastructure decision or unauthorized dependency.
+- [ ] Configured rules are resolved without probing unconfigured host-default filenames —
+  **FAILED**: acceptance generation reported that `CLAUDE.md` was absent even though
+  `.kaba/config.yml` designates `AGENTS.md`; CODEX-007 recurrence.
+- [ ] Each workflow stage writes only its owned artifacts and preserves downstream overwrite gates
+  — **FAILED**: targeted `clarify` rewrote `acceptance-criteria.md` in place while updating
+  `spec.md`; CODEX-020.
+- [ ] Test planning correctly handles existing contracts and architecture rather than behaving as
+  if the project were greenfield — **FAILED**: existing service/request conventions were reused,
+  but the unsaved-edit Rack::Test journey selects a server-observable Complete interaction while
+  claiming that mechanism remains open; CODEX-004 recurrence.
+- [ ] Atomic acceptance coverage composes into a usable list → experiment → outcome → completion →
+  observed-result journey through visible application controls — **FAILED**: all 101 current
+  criteria remain isolated and none requires the connected capability; CODEX-013 recurrence.
+- [ ] Natural isolated test review and the separate human composition gate both reach GO before
+  code planning; no deliberately weakened test is injected.
+- [ ] Code planning preserves service-owned business workflows and thin models/controllers.
+- [ ] Implementation preserves all Feature 001 behavior, keeps tests untouched, passes snapshots,
+  RSpec, RuboCop, and Brakeman, and clears the session lock.
+- [ ] Every applicable CODEX-002 through CODEX-014 recurrence or non-recurrence is distinguished
+  from defects that this run does not exercise.
+- [ ] The completed scorecard compares greenfield and established-project behavior without calling
+  a frozen defect fixed merely because Feature 002 did not trigger it.
 
 ---
 
