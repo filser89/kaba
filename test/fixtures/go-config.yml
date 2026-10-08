@@ -1,0 +1,18 @@
+test_runner: go
+test_command: go test ./...
+linter_command: make verify
+feature_dir: features/
+rules_files: [AGENTS.md]
+test_write_allow:
+  - "**/*_test.go"
+  - "**/testdata/**"
+  - "internal/testutil/**"
+  - "features/**"
+  - "go.mod"
+  - "go.sum"
+test_write_exclude: []
+implement_write_allow: ["**"]
+implement_write_exclude:
+  - "**/*_test.go"
+  - "**/testdata/**"
+  - "internal/testutil/**"

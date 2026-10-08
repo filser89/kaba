@@ -10,13 +10,16 @@ show_help() {
   cat <<'EOF'
 Usage: banned-patterns.sh [options] [file ...]
 
+Inspect tests for supported source/removal forms (Go) or banned test patterns (RSpec).
+
 Scan spec files for banned test patterns (receive, expect_any_instance_of,
 respond_to). Returns exit 0 on PASS, exit 1 on FAIL.
 
 Positional arguments:
   file ...           Specific files to scan (for targeted re-validation).
-                     If none given, scans all *_spec.rb files under the
-                     configured test directory (see .kaba/config.yml).
+                     Go always validates the complete selected inventory.
+                     RSpec scans selected files in explicit mode, or
+                     *_spec.rb under the legacy configured directory.
 
 Options:
   --json             Output in JSON format
@@ -61,7 +64,10 @@ scan_files() {
 print_results_text() {
   local repo_root="$1" file_count="$2" violation_count="$3"
 
-  echo "[banned-patterns] Scanning $file_count spec file(s)..."
+  echo "[banned-patterns] Scanning $file_count test file(s)..."
+  if [[ "$KABA_TEST_RUNNER" == go ]]; then
+    echo "Go source structures and removal markers inspected; RSpec matcher bans are inapplicable."
+  fi
   echo ""
 
   if [[ "$violation_count" -eq 0 ]]; then
@@ -101,7 +107,8 @@ print_results_json() {
     --argjson files_scanned "$file_count" \
     --argjson violation_count "$violation_count" \
     --argjson violations "$violations_json" \
-    '{verdict: $verdict, files_scanned: $files_scanned, violation_count: $violation_count, violations: $violations}'
+    --arg runner "$KABA_TEST_RUNNER" \
+    '{verdict: $verdict, files_scanned: $files_scanned, violation_count: $violation_count, violations: $violations, checks: (if $runner == "go" then {source_inventory:"PASS", removal_markers:"PASS", rspec_matcher_bans:"inapplicable"} else {rspec_matcher_bans:$verdict} end)}'
 }
 
 # --- Argument parsing ---
@@ -127,7 +134,26 @@ main() {
 
   local repo_root="$KABA_REPO_ROOT"
 
-  if [[ ${#FILES[@]} -eq 0 ]]; then
+  if [[ "$KABA_TEST_RUNNER" == go ]]; then
+    require_jq
+    local inventory selected file
+    inventory="$(bash "$SCRIPT_DIR/test-runner.sh" identities --phase baseline)" || kaba_die 'Go quality source inventory failed'
+    selected="$(printf '%s' "$inventory" | jq -r '.source_files[]')"
+    [[ -n "$selected" ]] || kaba_die 'no Go test files found in selected packages'
+    # A targeted scan still validates the complete selected inventory and markers.
+    for file in "${FILES[@]+"${FILES[@]}"}"; do [[ -f "$file" ]] || kaba_die "file not found: $file"; done
+    FILES=()
+    while IFS= read -r file; do FILES+=("$repo_root/${file#./}"); done <<< "$selected"
+    . "$SCRIPT_DIR/adapters/go.sh"
+    kaba_go_parse_command
+    kaba_go_helper quality "${FILES[@]}" || kaba_die 'Go quality removal-marker validation failed'
+  elif [[ "$KABA_PERMISSION_MODE" == explicit && ${#FILES[@]} -eq 0 ]]; then
+    require_jq
+    local inventory file
+    inventory="$(bash "$SCRIPT_DIR/test-runner.sh" identities --phase baseline)" || kaba_die 'RSpec quality source inventory failed'
+    while IFS= read -r file; do FILES+=("$repo_root/${file#./}"); done < <(printf '%s' "$inventory" | jq -r '[.examples[].file_path] | unique[]')
+    [[ ${#FILES[@]} -gt 0 ]] || kaba_die 'no RSpec test files found in selected inventory'
+  elif [[ ${#FILES[@]} -eq 0 ]]; then
     local spec_dir="$repo_root/${KABA_TEST_DIR%/}"
     [[ -d "$spec_dir" ]] || kaba_die "spec directory not found: $spec_dir"
     while IFS= read -r f; do
@@ -144,7 +170,7 @@ main() {
     require_jq
   fi
 
-  scan_files "${FILES[@]}"
+  if [[ "$KABA_TEST_RUNNER" == rspec ]]; then scan_files "${FILES[@]}"; fi
 
   local file_count=${#FILES[@]}
   local violation_count=${#VIOLATIONS[@]}

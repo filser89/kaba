@@ -18,7 +18,17 @@ asks to start over — in that case you will pass `--force` in step 5.
 
 Inspect the repository and propose values, showing the user what you found and why for each one:
 
-- **Test directory** — look for `spec/` or `test/` at the repo root.
+- **Runner** — inspect `go.mod`, Go test files, `.rspec`, and `spec/spec_helper.rb`;
+  propose `go` or `rspec`. Mixed/ambiguous stacks require a user choice.
+- **Ownership** — for Go propose all four independent allow/exclude lists. Test defaults
+  cover `**/*_test.go`, `**/testdata/**`, confirmed support locations, feature artifacts,
+  and shared dependency files (`go.mod`, `go.sum`). Implementation defaults allow `**`
+  and exclude test/support patterns. Shared files may match both; exclusions win within
+  each session. Read the [runner contract](../../docs/test-runners.md), resolved relative to this installed skill.
+  For legacy Rails/RSpec, propose `test_dir` and optional literal `test_writable`.
+- **Go test command** — propose plain `go test ./...` within the consumer module.
+- **Go quality command** — use the project's established verification command; inspect
+  its Makefile/scripts rather than inventing a required target. Ask when absent.
 - **Test command** — propose `bundle exec rspec` if `.rspec` or `spec/spec_helper.rb` exists.
 - **Linter command** — propose `bundle exec rubocop` if `.rubocop.yml` exists.
 - **Rules files** — check for `CLAUDE.md` and `AGENTS.md`; include whichever exist.
@@ -40,13 +50,14 @@ is the only way through this case.
 
 ## 4. Get explicit confirmation
 
-Present the full proposed configuration — test dir, test command, linter command, rules files,
+Present the full proposed configuration — runner, ownership lists or legacy test dir, shared files, test command, quality command, rules files,
 runner artifacts, feature dir — and get the user's explicit go-ahead before writing anything. Adjust
 any value the user pushes back on and re-confirm.
 
 ## 5. Call the script — never write the config by hand
 
-Run `scripts/init-project.sh` with the confirmed values, e.g.:
+Resolve `../../scripts/init-project.sh` relative to this installed skill and run it
+with the confirmed values, e.g.:
 
 ```
 scripts/init-project.sh --test-dir spec/ --test-command "bundle exec rspec" \
@@ -54,6 +65,22 @@ scripts/init-project.sh --test-dir spec/ --test-command "bundle exec rspec" \
   --test-writable "Gemfile,Gemfile.lock" --rules-files "CLAUDE.md" \
   --runner-artifact "spec/examples.txt"
 ```
+
+For explicit Go settings, repeat pattern flags (an empty argument writes an empty list):
+
+```bash
+scripts/init-project.sh --test-runner go --test-command "go test ./..." \
+  --feature-dir features/ --linter-command "make verify" \
+  --test-write-allow '**/*_test.go' --test-write-allow '**/testdata/**' \
+  --test-write-allow 'internal/testutil/**' --test-write-allow 'features/**' \
+  --test-write-allow go.mod --test-write-allow go.sum --test-write-exclude '' \
+  --implement-write-allow '**' --implement-write-exclude '**/*_test.go' \
+  --implement-write-exclude '**/testdata/**' --implement-write-exclude 'internal/testutil/**'
+```
+
+Use the confirmed project command in place of the example `make verify`. Explicit
+RSpec settings use the same four-list interface with `--test-runner rspec`. Include
+all four lists and omit `--test-dir`/`--test-writable` in explicit mode.
 
 Pass `--force` only if the user explicitly asked to overwrite an existing config or adopt a
 non-empty feature directory. The script does all the writing: it creates the feature directory,

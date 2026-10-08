@@ -18,7 +18,9 @@ payload="$(cat)"
 tool_name="$(printf '%s' "$payload" | jq -r '.tool_name // empty')"
 
 if [ "$tool_name" = "apply_patch" ]; then
-  patch="$(printf '%s' "$payload" | jq -r '.tool_input.command // empty')"
+  if ! patch="$(printf '%s' "$payload" | jq -jr '
+    (.tool_input.command // "") | if contains("\u0000") then error("unsupported NUL in patch") else . + "." end')"; then exit 2; fi
+  patch="${patch%.}"
   [ -n "$patch" ] || exit 0
 
   # apply_patch headers are the authoritative path declarations. An Update with
@@ -41,7 +43,10 @@ EOF
   if "$SCRIPT_DIR/session-lock.sh" check "$@"; then exit 0; else exit 2; fi
 fi
 
-file_path="$(printf '%s' "$payload" | jq -r '.tool_input.file_path // .tool_input.notebook_path // empty')"
+if ! file_path="$(printf '%s' "$payload" | jq -jr '
+  (.tool_input.file_path // .tool_input.notebook_path // "") |
+  if contains("\u0000") then error("unsupported NUL in path") else . + "." end')"; then exit 2; fi
+file_path="${file_path%.}"
 [ -n "$file_path" ] || exit 0
 
 if "$SCRIPT_DIR/session-lock.sh" check "$file_path"; then exit 0; else exit 2; fi

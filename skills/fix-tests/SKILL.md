@@ -4,6 +4,11 @@ disable-model-invocation: true
 description: Read test-review findings, apply mechanical fixes to test files, interactively resolve escalated findings, re-validate via snapshot and banned-pattern scan, and write an audit log.
 ---
 
+At the load-context step, read `$(git config kaba.scriptdir)/../docs/test-runners.md` for the configured runner's
+ownership, identity, source, criterion-marker, scaffolding, and cleanup contracts.
+Apply that runner's branch to the steps below. RSpec describe blocks/factories map to
+Go named functions/subtests/table rows and fixtures/helpers when `test_runner: go`.
+
 ## User Input
 
 ```text
@@ -23,8 +28,7 @@ This runs after `/kaba:review-tests` produces a NO-GO verdict. It is a **test-se
 
 ## Operating Constraints
 
-**TEST FILES + ONE REPORT**: Only modify files in the test directory (`test_dir` in
-`.kaba/config.yml`) and write `FEATURE_DIR/test-fixes.md`. Never write implementation code.
+**TEST FILES + ONE REPORT**: Only modify files in test-owned paths (the configured permission classifier) and write `FEATURE_DIR/test-fixes.md`. Never write implementation code.
 
 **Project Rules Authority**: The project rules (CLAUDE.md/AGENTS.md, per `.kaba/config.yml`'s
 `rules_files`) are non-negotiable. A fix that would introduce a project rules violation is itself
@@ -60,7 +64,7 @@ If `ACCEPTANCE` is missing, ERROR and stop — suggest running `/kaba:acceptance
 - Read `CLAUDE.md` for project test conventions and banned patterns.
 - Read the project rules (CLAUDE.md/AGENTS.md, per `.kaba/config.yml`'s `rules_files`) for
   project-wide constraints.
-- The test directory is `test_dir` in `.kaba/config.yml` — read it from there; never infer it from project structure.
+- Identify test-owned paths from `.kaba/config.yml` and the classifier; explicit configurations have no `test_dir`.
 
 ### 3. Check verdict
 
@@ -93,7 +97,7 @@ anything else, and be confident it's the right fix? Yes → mechanical. No → e
 
 For each mechanical finding:
 1. Read the test file.
-2. Locate the test block via the criterion ID marker (the trailing `# CRITERION-ID` comment placed
+2. Locate the test block via the criterion ID marker (the `# CRITERION-ID` (RSpec) or `// CRITERION-ID` (Go) comment placed
    by `/kaba:implement-tests`).
 3. Read the criterion's assertion text from `ACCEPTANCE` to confirm what the test must verify.
 4. Apply the recommended change from the finding's Recommendation column.
@@ -278,8 +282,7 @@ After:
 ## Key Rules
 
 1. **Only test files.** Never write implementation code. Never modify non-test files except
-   `test-fixes.md`. The test directory is `test_dir` in `.kaba/config.yml` — read it from there;
-   never infer it from project structure.
+   `test-fixes.md`. Use configured test permissions and runner inventory; explicit configurations have no `test_dir`.
 2. **Scope and certainty determine classification.** Same-file + known fix = mechanical.
    Cross-file or uncertain = escalated. Severity is irrelevant to this classification.
 3. **Every mechanical fix must be verifiable.** The before/after in `test-fixes.md` makes the

@@ -4,6 +4,11 @@ disable-model-invocation: true
 description: Write all test code following the test plan. Only test files — no implementation code.
 ---
 
+At the load-context step, read `$(git config kaba.scriptdir)/../docs/test-runners.md` for the configured runner's
+ownership, identity, source, criterion-marker, scaffolding, and cleanup contracts.
+Apply that runner's branch to the steps below. RSpec describe blocks/factories map to
+Go named functions/subtests/table rows and fixtures/helpers when `test_runner: go`.
+
 ## User Input
 
 ```text
@@ -30,11 +35,11 @@ You **MUST** consider the user input before proceeding (if not empty). The user 
 
 3. **Arm the session lock, establish the baseline, validate the plan**:
    1. Run `$(git config kaba.scriptdir)/session-lock.sh set test` from repo root — this locks implementation code for the duration of the test session (enforced by the PreToolUse guard and the pre-commit hook).
-   2. Run `$(git config kaba.scriptdir)/snapshot-tests.sh capture baseline` from repo root. The script decides fresh-start vs resume itself: with a clean test directory it (re)captures; with in-progress test work it refuses to overwrite an existing baseline and keeps it — recapturing over half-written tests would absorb them into the baseline and silently exempt them from the new-test gate.
+   2. Run `$(git config kaba.scriptdir)/snapshot-tests.sh capture baseline` from repo root. The script decides fresh-start vs resume itself: with clean test-owned paths it (re)captures; with in-progress test work it refuses to overwrite an existing baseline and keeps it — recapturing over half-written tests would absorb them into the baseline and silently exempt them from the new-test gate.
    3. Run `$(git config kaba.scriptdir)/snapshot-tests.sh validate-plan` from repo root. This checks every entry of `FEATURE_DIR/test-plan.json` (schema v3) against the baseline: identities and descriptions resolve, PINs do not already exist, and action/landing pairs are legal. If it FAILS, the plan is stale relative to reality — STOP and emit the test-plan defect escalation (see Escalation below) with the validator's per-entry errors. Do not write any test code past a failed validation. On PASS the validator also writes `snapshots/test-plan.lock.json` — the plan lock. The post-test compare verifies the live `test-plan.json` against it: any in-session edit to a locked entry fails the gate, so the plan file is hands-off from here.
 
 4. **Survey existing test infrastructure**:
-   - The test directory is `test_dir` in `.kaba/config.yml` — read it from there; never infer it from project structure.
+   - Identify test-owned paths from `.kaba/config.yml` and the classifier; explicit configurations have no `test_dir`.
    - Read test helper and configuration files (e.g., `rails_helper.rb`, `spec_helper.rb`, `conftest.py`, `jest.config.*`).
    - Read all existing support/helper files for patterns to follow (require statements, module inclusion, configuration conventions).
    - Note existing factories/fixtures.
@@ -57,16 +62,16 @@ You **MUST** consider the user input before proceeding (if not empty). The user 
      - Write test blocks with descriptive names derived from the acceptance criteria.
      - Each test block must contain a real assertion that exercises the criterion's behavior.
      - **Pin examples are contract**: an example backing a PIN entry must carry the plan's full description byte-for-byte (describe path + example description) — compare matches pins by exact file + description, and a wording drift lands as a "new test should be failed" violation with an unmatched-PIN hint.
-     - **End every example's opening line with a trailing `# CRITERION-ID` comment** naming the criterion it covers (e.g. `it "rejects blank name" do # VAL-001`). review-tests and fix-tests locate tests by this marker; it is prose for them, never parsed by scripts.
+     - **Mark each criterion in source: RSpec uses trailing `# CRITERION-ID`; Go uses `// CRITERION-ID` beside its function/subtest/table row** naming the criterion it covers (e.g. `it "rejects blank name" do # VAL-001`). review-tests and fix-tests locate tests by this marker; it is prose for them, never parsed by scripts.
    - **For each MODIFY file**:
      - Read the existing file first to understand its current structure.
      - Add new describe/context/it blocks as specified in test-plan.md's Describe Blocks for this file.
-     - Renaming an existing block is allowed only when the plan's Planned State Changes declares it. Removing or reordering existing blocks is NEVER allowed in-session — removal has its own lane (REMOVE entries, below), and reordering breaks the positional identities the whole gate rests on.
-     - Add new blocks APPENDED after existing siblings — never inserted before or between them. Appending preserves every existing test's address; insertion shifts them and will fail the compare loudly.
+     - Renaming an existing block is allowed only when the plan's Planned State Changes declares it. Remove tests through the skip-now/cleanup process. RSpec block reordering changes positional identities; Go named rows may reorder without identity drift.
+     - For RSpec, append new blocks after existing siblings to preserve positional addresses. Go rows have stable names; follow the supported source convention in the runner reference.
      - Integrate new blocks into the existing hierarchy — match the file's current style and conventions.
-   - **For each REMOVE entry in the plan's Planned State Changes**: do not delete the test. Mark it skipped with the removal marker, using the project's framework idiom (per CLAUDE.md), carrying the feature name — e.g. for RSpec: `it "original description", skip: "REMOVED by 004-feature-name" do`. The test must report as pending at post-test.
+   - **For each REMOVE entry in the plan's Planned State Changes**: do not delete the test. Mark it skipped with the removal marker, using the project's framework idiom (per CLAUDE.md), carrying the feature name — e.g. for RSpec: `it "original description", skip: "REMOVED by 004-feature-name" do`. For Go, use the supported leaf `t.Skip` or table `removedBy` convention in the runner reference. The test must report as pending at post-test.
    - **For all test files**: Tests MUST fail because implementation is missing (correct failure), not because of syntax errors or misconfigured support files (incorrect failure).
-   - **Tests must register even though the implementation does not exist yet**: do not reference a not-yet-defined implementation symbol where the framework resolves it at file-load / collection time (e.g. a class named in a test-group header, or a top-of-file import of the unbuilt module). That aborts loading and registers zero tests for the file — the snapshot/compare gate then silently passes on nothing (the capture step hard-fails on such load/collection errors). Reference implementation lazily instead — inside test bodies, or via factories/fixtures — so every test registers and fails at **run** time for the right reason. Follow the project's test conventions (CLAUDE.md) for the framework-specific idiom that achieves this.
+   - **Tests must register before implementation exists**: For RSpec, resolve missing production constants lazily inside examples/factories rather than at collection time. For Go, use the runner reference's validated compilation scaffold convention for missing declarations. Source discovery plus complete runtime outcomes are required; a compile error, failed setup hiding children, or package-aborting placeholder invalidates capture. Missing production behavior must produce real failed assertions.
    - **After each file**: Report which file was created or modified and how many criteria it covers.
 
 7. **Snapshot post-test and compare**:
@@ -130,7 +135,7 @@ The human re-runs `/kaba:plan-tests` with this block as input; it regenerates th
 7. **The test plan is a contract, and its allowlist is the gate's input.** If the plan has errors or gaps, STOP and emit the test-plan defect escalation — do not silently deviate, and never edit test-plan.md or test-plan.json from this session. Re-planning belongs to `/kaba:plan-tests`. The lock (`snapshots/test-plan.lock.json`) makes this mechanical — compare fails on any in-session plan edit.
 8. **Tests must register before the implementation exists.** Don't let a test file fail to load/collect by referencing a not-yet-defined symbol at load time (a class in a group header, a top-of-file import). Reference implementation lazily so each test registers and fails at run time. See CLAUDE.md for the project's framework-specific idiom.
 9. **Gate exemptions: smallest unit, justified, or escalate.** Exemptions to any automated quality gate (N+1 detector, linter, type checker, and the like) MUST be scoped to the smallest unit that exhibits the justified pattern — a single test, line, or code path — never a whole file or directory. Every exemption MUST carry a documented justification at the exemption site. If the gate's tooling cannot express an exemption that narrow, escalate rather than widen.
-10. **Existing tests: append, rename only as planned, never delete or reorder.** New blocks go after existing siblings. REMOVE entries are skip-marked, not deleted — deletion belongs to the post-feature cleanup script, never to this session. Violations don't corrupt the gate — they fail it loudly; fix by restoring the file, never by adjusting the plan.
+10. **Existing tests: preserve identities, rename only as planned, use cleanup for deletion.** Append RSpec blocks after existing siblings; Go names remain stable under row reordering. REMOVE entries are skip-marked, not deleted — deletion belongs to the post-feature cleanup script, never to this session. Violations don't corrupt the gate — they fail it loudly; fix by restoring the file, never by adjusting the plan.
 
 ## Next Step
 

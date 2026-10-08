@@ -95,4 +95,44 @@ assert_ok           "off permits again"    lock check app/models/x.rb
 # --- invalid input ---
 assert_fail "rejects an unknown mode" 1 lock set banana
 
+# Explicit permissions protect colocated tests and fixtures at the public gate.
+cp "$SCRIPT_DIR/fixtures/go-config.yml" "$repo/.kaba/config.yml"
+mkdir -p "$repo/internal/pay" "$repo/internal/testutil"
+touch "$repo/internal/pay/pay_test.go" "$repo/internal/pay/pay.go"
+ln -s pay_test.go "$repo/internal/pay/alias.go"
+ln -s pay.go "$repo/internal/pay/alias_test.go"
+ln -s /tmp "$repo/internal/pay/outside"
+lock set implement >/dev/null
+assert_fail "implementation cannot write a colocated test" 1 lock check internal/pay/pay_test.go
+assert_fail "implementation cannot remove a fixture" 1 lock check internal/pay/testdata/input.json
+assert_fail "implementation cannot write test helpers" 1 lock check internal/testutil/helper.go
+assert_ok "implementation can write colocated production" lock check internal/pay/pay.go
+assert_ok "implementation can write shared manifest" lock check go.mod
+assert_fail "implementation rejects symlink to test" 1 lock check internal/pay/alias.go
+assert_fail "implementation rejects lexical test symlink" 1 lock check internal/pay/alias_test.go
+touch "$repo/internal/pay/"$'controlled.go\n'
+ln -s $'controlled.go\n' "$repo/internal/pay/control-alias.go"
+assert_fail "implementation rejects controlled symlink target" 1 lock check internal/pay/control-alias.go
+mkdir -p "$repo/internal/"$'controlled\n/nested'
+ln -s $'controlled\n' "$repo/internal/control-directory"
+assert_fail "implementation rejects controlled physical ancestor" 1 lock check internal/control-directory/nested/new.go
+assert_fail "implementation rejects outside absolute path" 1 lock check /tmp/outside.go
+assert_fail "implementation rejects outside symlink target" 1 lock check internal/pay/outside/new.go
+assert_fail "implementation rejects newline path" 1 lock check $'internal/pay/new\n_test.go'
+assert_fail "implementation rejects tab path" 1 lock check $'internal/pay/new\t.go'
+assert_fail "implementation rejects newline with duplicate separators" 1 lock check $'internal//pay/pay.go\n'
+assert_fail "implementation rejects repeated dot path" 1 lock check ././internal//pay/pay_test.go
+assert_fail "implementation rejects symlink root alias" 1 lock check "$symrepo/internal/pay/pay_test.go"
+lock set test >/dev/null
+assert_fail "test session cannot write production" 1 lock check internal/pay/pay.go
+assert_ok "test session can write colocated test" lock check internal/pay/pay_test.go
+assert_ok "test session can create fixture with spaces" lock check 'internal/pay/testdata/input data.json'
+assert_ok "test session can write shared manifest" lock check go.mod
+assert_fail "test session rejects symlink to production" 1 lock check internal/pay/alias_test.go
+assert_fail "test session rejects lexical production symlink" 1 lock check internal/pay/alias.go
+ln -s absent "$repo/internal/pay/dangling_test.go"
+assert_fail "test session rejects dangling symlink" 1 lock check internal/pay/dangling_test.go
+lock clear >/dev/null
+assert_ok "explicit off mode permits unsupported path" lock check $'/tmp/outside\n.go'
+
 rm -rf "$repo" "$repo2" "$(dirname "$symrepo")"

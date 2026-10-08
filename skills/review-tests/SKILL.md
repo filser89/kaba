@@ -5,6 +5,11 @@ context: fork
 description: Review the test suite for strength before implementation — could a terrible implementation pass these tests? Read-only; writes a severity-graded findings report.
 ---
 
+At the load-context step, read `$(git config kaba.scriptdir)/../docs/test-runners.md` for the configured runner's
+ownership, identity, source, criterion-marker, scaffolding, and cleanup contracts.
+Apply that runner's branch to the steps below. RSpec describe blocks/factories map to
+Go named functions/subtests/table rows and fixtures/helpers when `test_runner: go`.
+
 ## User Input
 
 ```text
@@ -58,7 +63,7 @@ before human review and Phase 3 implementation.
 ## Operating Constraints
 
 **READ-ONLY EXCEPT ONE FILE**: Do not modify any file except the report at
-`FEATURE_DIR/test-review.md`. Never edit the test directory (`test_dir` in `.kaba/config.yml`),
+`FEATURE_DIR/test-review.md`. Never edit test-owned paths (the configured permission classifier),
 never write implementation code, never run the test suite or write a reference implementation.
 
 **Project Rules Authority**: The project rules (CLAUDE.md/AGENTS.md, per `.kaba/config.yml`'s
@@ -96,14 +101,14 @@ If `ACCEPTANCE` or `TEST_PLAN` is missing, ERROR and stop — suggest running
 - Read `CLAUDE.md` for project test conventions.
 - Read the project rules (CLAUDE.md/AGENTS.md, per `.kaba/config.yml`'s `rules_files`) for
   project-wide constraints.
-- The test directory is `test_dir` in `.kaba/config.yml` — read it from there; never infer it from project structure.
+- Identify test-owned paths from `.kaba/config.yml` and the classifier; explicit configurations have no `test_dir`.
 
 ### 3. Build the review map
 
 From `TEST_PLAN`, list every criterion ID and the test file + describe block it maps to. **In
 scoped mode, only map the criteria matching the provided IDs.** Read the actual test files and
-locate each criterion's test — the specs carry a trailing `# CRITERION-ID` comment on each
-example, use it to match. Build, in memory, a table of
+locate each criterion's test — tests carry `# CRITERION-ID` (RSpec) or `// CRITERION-ID` (Go) at each
+criterion-bearing example/function/subtest/table row, use it to match. Build, in memory, a table of
 `criterion → assertion (from criteria) → located test (file:line, code)`.
 
 ### 4. Core detection passes
@@ -211,8 +216,7 @@ Print a short summary to the conversation (counts + verdict + report path) and s
 
 ## Key Rules
 
-1. **Read-only except `test-review.md`.** Never modify the test directory (`test_dir` in
-   `.kaba/config.yml`), never write implementation code, never run the suite.
+1. **Read-only except `test-review.md`.** Never modify test-owned paths (the configured permission classifier), never write implementation code, never run the suite.
 2. **Every weakness finding MUST carry a concrete passing stub.** No stub ⇒ drop the finding.
    This is the false-positive filter.
 3. **Core checks only.** Assertion strength, criterion↔test fidelity, coverage depth. Do NOT

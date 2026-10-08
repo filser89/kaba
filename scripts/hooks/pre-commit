@@ -13,7 +13,7 @@ if [ -z "$scriptdir" ] || [ ! -x "$scriptdir/session-lock.sh" ]; then
   exit 1
 fi
 
-if ! git diff --cached --name-only --no-renames --diff-filter=ACMRDT -z | xargs -0 "$scriptdir/session-lock.sh" check; then
+if ! "$scriptdir/session-lock.sh" check-staged; then
   echo "" >&2
   echo "Commit rejected by the kaba session-lock pre-commit hook." >&2
   exit 1

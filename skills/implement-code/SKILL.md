@@ -4,6 +4,11 @@ disable-model-invocation: true
 description: Write implementation code to make the locked test suite green, following code-plan.md. Only implementation files — never test files.
 ---
 
+At the load-context step, read `$(git config kaba.scriptdir)/../docs/test-runners.md` for the configured runner's
+ownership, identity, source, criterion-marker, scaffolding, and cleanup contracts.
+Apply that runner's branch to the steps below. RSpec describe blocks/factories map to
+Go named functions/subtests/table rows and fixtures/helpers when `test_runner: go`.
+
 ## User Input
 
 ```text
@@ -20,22 +25,22 @@ You **MUST** consider the user input before proceeding (if not empty). The user 
      - `PRIOR_RUN=no` — proceed. This is the normal case for both a fresh start and the idempotent re-run described in Key Rule 2: `post-impl.json` is written only after all end gates pass, so a session that stopped short leaves the gate open.
      - `PRIOR_RUN=unknown`, a non-zero exit, or no `PRIOR_RUN=` line at all — STOP and report the script's stderr verbatim. **Absence of an answer is never "no."**
 
-2. **Arm the session lock**: Run `$(git config kaba.scriptdir)/session-lock.sh set implement` from the repo root. This locks the test directory for the duration of the implementation session (enforced by the PreToolUse guard and the pre-commit hook).
+2. **Arm the session lock**: Run `$(git config kaba.scriptdir)/session-lock.sh set implement` from the repo root. This locks test-owned files for the duration of the implementation session (enforced by the PreToolUse guard and the pre-commit hook).
 
 3. **Load context**:
    - **REQUIRED**: Read `FEATURE_DIR/code-plan.md` — the implementation contract (components with action→test-group mapping, data model, decision verdicts, build order). If missing, ERROR and stop — suggest running `/kaba:plan-code` first.
    - **REQUIRED**: Verify `FEATURE_DIR/snapshots/post-test.json` exists — the locked-suite snapshot this session is graded against. If missing, ERROR and stop — the test session is incomplete.
-   - Read `CLAUDE.md` for project conventions — this is where the framework specifics live: the test directory, the test runner, the linter, the generator tooling and how to disable its test scaffolding, style rules.
+   - Read `CLAUDE.md` for project conventions — this is where the framework specifics live: test-owned files, the test runner, the linter, the generator tooling and how to disable its test scaffolding, style rules.
    - Read the project rules (CLAUDE.md/AGENTS.md, per `.kaba/config.yml`'s `rules_files`) for project-wide constraints.
    - Read `.kaba/architecture.md` for the existing patterns the code must stay consistent with.
-   - The test directory is `test_dir` in `.kaba/config.yml` — read it from there; never infer it from project structure.
+   - Identify test-owned paths from `.kaba/config.yml` and the classifier; explicit configurations have no `test_dir`.
    - Do **NOT** read `spec.md`, `acceptance-criteria.md`, or `test-plan.md` — their content is absorbed into the plan and the locked tests. The plan says what to build; the tests referee it. Test files are read per build-order step as needed.
 
 4. **Survey the existing codebase**: Read the project manifest and configuration, and the existing implementation directories, for patterns to follow (naming, base classes, module conventions). The plan's components follow `architecture.md`; the code must match how the project actually does things.
 
 5. **Execute the Build Order, step by step** — the Build Order in `code-plan.md` is the task list. For each step, in order:
    - Re-read the step's entry in the plan's Components section: its responsibility, the test groups it greens, its collaborators, and any Decision verdicts that constrain it. Read the test files it claims to green — they are the precise behavioral contract.
-   - **Use the project's generators** where one exists for what's being created (per project conventions), **with any test-file scaffolding disabled** — a generator must never create or modify files in the test directory. Generated test files would violate the session lock, conflict with the locked suite, and fail the post-impl compare as "new test added". The framework-specific flag comes from project conventions.
+   - **Use the project's generators** where one exists for what's being created (per project conventions), **with any test-file scaffolding disabled** — a generator must never create or modify files in test-owned files. Generated test files would violate the session lock, conflict with the locked suite, and fail the post-impl compare as "new test added". The framework-specific flag comes from project conventions.
    - **Apply schema changes** through the project's standard mechanism (per conventions), ensuring the test environment sees them before tests run.
    - **Run the test files this step claims to green** using the project's test runner. Iterate until they pass. Earlier steps' tests must stay green; a wrong turn surfaces here, not after the last step.
    - **After each step**: Report which files were created or modified and which test groups went green.
@@ -43,12 +48,12 @@ You **MUST** consider the user input before proceeding (if not empty). The user 
 6. **End gates** — run in order; ALL must PASS:
    1. **Snapshot capture**: Run `$(git config kaba.scriptdir)/snapshot-tests.sh capture post-impl` from the repo root. The capture aborts loudly on load errors — fix those first (they mean broken code, not missing implementation).
    2. **Snapshot compare**: Run `$(git config kaba.scriptdir)/snapshot-tests.sh compare post-impl` — the script resolves both snapshot paths from the feature directory itself.
-   3. **Test directory untouched**: The working tree under the test directory must be clean per version control (`git status --porcelain -- <test-dir>` prints nothing). This catches in-place test edits the compare cannot see, and untracked files.
-   4. **Linter**: Run the project's linter (per conventions); it must pass. Quality checks that run inside the test suite (e.g. N+1 detection) have already ridden along with the green run.
+   3. **Ownership gate**: Run `$(git config kaba.scriptdir)/session-lock.sh check-dirty implement`. It must pass for staged, unstaged, untracked, deleted, and both rename endpoints using the configured classifier. The Go snapshot also protects all test-owned file contents, including ignored helpers/fixtures/scaffolds.
+   4. **Project quality command**: Run the exact configured `linter_command` from `.kaba/config.yml` at repo root; its exit status must be zero. A failing command blocks completion and leaves the lock armed. Quality checks that run inside the test suite (e.g. N+1 detection) have already ridden along with the green run.
    - **If a gate FAILS**, diagnose by violation type:
      - Feature tests still red → implementation incomplete. Continue iterating within the plan (see Key Rule 2), or escalate if the plan itself is the obstacle (step 7).
      - Regression (a previously passing test now fails) → this feature's code broke existing behavior. Fix without altering any existing behavioral contract.
-     - "New test added" / "test was removed" / test directory dirty → the test directory was touched. Restore it from version control; never "fix" this by adjusting tests.
+     - "New test added" / "test was removed" / test directory dirty → test-owned files was touched. Restore it from version control; never "fix" this by adjusting tests.
      - Linter offenses → fix the style violations; they never justify touching a test or deviating from the plan.
    - Re-capture, re-compare, and re-run gates after fixes. Repeat until all PASS — or stop with an escalation.
 
@@ -74,20 +79,20 @@ You **MUST** consider the user input before proceeding (if not empty). The user 
    - Build order: [N] / [N] steps completed
    - Suite: [G] green / [T] total ([R] were red at post-test)
    - Snapshot compare (post-impl): PASS / FAIL
-   - Test directory untouched: PASS / FAIL
-   - Linter: PASS / FAIL
+   - Ownership gate: PASS / FAIL
+   - Project quality command: PASS / FAIL
    ```
 
    If ANY gate is FAIL, do NOT report completion. Fix and re-validate, or escalate (step 7).
 
 ## Key Rules
 
-1. **Only implementation files — never the test directory.** The session lock enforces this mechanically; the compare and the test-directory-untouched gate verify it. Tests going green must come from implementation, nothing else.
+1. **Only implementation files — never test-owned files.** The session lock enforces this mechanically; the compare and the classifier-based ownership gate verify it. Tests going green must come from implementation, nothing else.
 2. **The plan is a contract.** Components, schema, decision verdicts, and build order are fixed by `code-plan.md`. Below the plan's altitude — method bodies, private decomposition, helper internals — is this command's own territory: iterate there freely.
 3. **Escalate plan defects; never improvise architecture.** If a test cannot go green within the plan, the plan is broken — stop and report (Outline step 7). Silent deviation is forbidden. Re-planning belongs to `/kaba:plan-code`.
 4. **Green for the right reason.** Never weaken, skip, disable, or delete a test to pass a gate. A gate that can only pass by touching a test is an escalation, not a workaround.
-5. **Generators must never touch the test directory.** Use the project's generators for what they cover (per conventions), always with test scaffolding disabled.
-6. **Framework specifics come from project conventions, never from this command.** Test directory, test runner, and linter come from `.kaba/config.yml` (`test_dir`, `test_command`, `linter_command`); generator flags are resolved from CLAUDE.md and project structure at runtime.
+5. **Generators must never touch test-owned files.** Use the project's generators for what they cover (per conventions), always with test scaffolding disabled.
+6. **Framework specifics come from project conventions, never from this command.** Ownership patterns, test runner, and quality command come from `.kaba/config.yml`; generator flags are resolved from CLAUDE.md and project structure at runtime.
 7. **Respect existing code.** Follow `architecture.md` and the patterns the codebase actually uses. Do not refactor existing code beyond what the plan calls for.
 8. **Never commit.** Finishing the work and committing it are separate; the human decides when to commit.
 9. **All gates must PASS before reporting done.** No partial-success completion reports.

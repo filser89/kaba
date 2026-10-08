@@ -4,6 +4,11 @@ disable-model-invocation: true
 description: Translate acceptance criteria into a concrete test plan — file locations, factory needs, shared contexts, and criterion-to-file mapping. No test code.
 ---
 
+At the load-context step, read `$(git config kaba.scriptdir)/../docs/test-runners.md` for the configured runner's
+ownership, identity, source, criterion-marker, scaffolding, and cleanup contracts.
+Apply that runner's branch to the steps below. RSpec describe blocks/factories map to
+Go named functions/subtests/table rows and fixtures/helpers when `test_runner: go`.
+
 ## User Input
 
 ```text
@@ -36,11 +41,11 @@ This is a **planning step**, not a writing step. No test code is produced. The o
    - Read `CLAUDE.md` for project conventions (test framework, directory layout, naming conventions, etc.).
    - Load the test plan template from `$(git config kaba.scriptdir)/../templates/test-plan-template.md`. This defines the exact output structure.
 
-3. **Identify the test directory**:
-   - The test directory is `test_dir` in `.kaba/config.yml` — read it from there; never infer it from project structure.
+3. **Identify test-owned paths**:
+   - Identify test-owned paths from `.kaba/config.yml` and the classifier; explicit configurations have no `test_dir`.
 
 4. **Survey the existing test suite**:
-   - List all files in the test directory.
+   - List the configured test-owned files and runner inventory.
    - For files that might overlap with this feature, read their structure (test groups, test names, shared setup, factories/fixtures). This informs placement and granularity (steps 5–8) only — it is NOT how invalidated tests are discovered; that is step 9's sweep.
    - Note existing factories/fixtures, shared helpers, support files, and reusable modules.
    - Note the project's test file naming conventions and directory organization patterns.
@@ -55,7 +60,7 @@ This is a **planning step**, not a writing step. No test code is produced. The o
 
 8. **Map criteria to files**: Produce the Criteria Mapping table. Every criterion ID from the acceptance criteria document MUST appear in exactly one row.
 
-9. **Run the invalidation sweep**: Apply the **Invalidation Sweep Rules** below to every contract delta from step 4 — derive probes, run them as content searches over the entire test directory, resolve hits to examples via the step-4 identity listing, and disposition every hit example as KEEP, MODIFY, or REMOVE. Record probes, hits, and dispositions for the plan's Invalidation Sweep section. If step 4 recorded no contract deltas, record that and continue.
+9. **Run the invalidation sweep**: Apply the **Invalidation Sweep Rules** below to every contract delta from step 4 — derive probes, run them as content searches over all configured test-owned source paths, resolve hits to examples via the step-4 identity listing, and disposition every hit example as KEEP, MODIFY, or REMOVE. Record probes, hits, and dispositions for the plan's Invalidation Sweep section. If step 4 recorded no contract deltas, record that and continue.
 
 10. **Plan state changes**: Derive the Planned State Changes table from the step-9 dispositions: every MODIFY/REMOVE disposition becomes a row — action, identity, description (both copied from the step-4 identity listing, never composed from reading spec source), expected landing, and reason. Two further actions extend the table beyond sweep dispositions:
     - **PIN** — a planned NEW example that lands green because the behavior already conforms but is untested. A PIN row carries no address (the example does not exist yet): its identity is the file plus the exact planned full description, which must match the file's Describe Blocks plan verbatim. Expected landing is always `passed`.
@@ -77,7 +82,7 @@ This is a **planning step**, not a writing step. No test code is produced. The o
         {"action": "REMOVE", "expected_landing": "pending",
          "id": "[identity]", "file": "[file path]", "description": "[recorded description]"},
         {"action": "PIN", "expected_landing": "passed",
-         "file": "[file path, RSpec form with leading ./]",
+         "file": "[runner-native file path: RSpec leading ./; Go repository-relative]",
          "description": "[exact planned full description of the not-yet-written example]"},
         {"action": "TOUCH", "expected_landing": "unchanged",
          "id": "[identity]", "file": "[file path]", "description": "[recorded description]"}
@@ -85,7 +90,7 @@ This is a **planning step**, not a writing step. No test code is produced. The o
     }
     ```
 
-    Legal pairs: MODIFY → `failed` (or `passed` when the modified assertion already holds — a conforming modify), REMOVE → `pending`, PIN → `passed`, TOUCH → `unchanged`. PIN is the only action without an `id` — the example does not exist yet, so its identity is the file plus the exact planned full description (describe path + example description), which `implement-tests` must reproduce byte-for-byte. Never emit `source` or `finding` keys — those mark in-session appends by fix-tests, not plan authorship.
+    Legal pairs: MODIFY → `failed` (or `passed` when the modified assertion already holds — a conforming modify), REMOVE → `pending`, PIN → `passed`, TOUCH → `unchanged`. PIN is the only action without an `id` — the example does not exist yet, so its identity is the file plus the exact planned full description (RSpec describe path + example description; Go full runtime name), which `implement-tests` must reproduce byte-for-byte. Never emit `source` or `finding` keys — those mark in-session appends by fix-tests, not plan authorship.
 
     An empty `entries` array is an affirmative statement: this plan declares no state changes. The JSON is machine-written by this command, whole, on every run.
 
@@ -312,7 +317,7 @@ Probes err broad. Over-matching costs a disposition line; under-matching recreat
 
 ### The sweep
 
-1. Run every probe as a content search over the ENTIRE test directory. Never restrict the search to files whose names relate to the feature.
+1. Run every probe as a content search over the ENTIRE configured test-owned source set. Never restrict the search to files whose names relate to the feature.
 2. Resolve each hit line to its enclosing example via the identity listing (address + description).
 3. Disposition every hit example, exactly one of:
    - **KEEP** — still passes under the new contract. Lawful only with a stated one-line reason ("refused delete leaves the record active; `exists?` still true"). An example that reads the response of a changed endpoint, or asserts a post-condition the delta touches, can never be KEEP by default.
@@ -332,7 +337,7 @@ The sweep's cost is proportional to the change's blast radius (hits), never to s
 
 ### Examples
 
-- ✅ CORRECT: delta "standard delete: 200 + data envelope + destroys → 204 + empty body + moves to trash" (unconditional) → probe `delete "/api/v1/bookmarks` over the whole test directory → hits in the destroy, response-format, authentication, pagination, scoping, and out-of-scope files → every hit example dispositioned; the response-format file's delete-response assertions become MODIFY/REMOVE rows even though the file is "about" response format, not deletion.
+- ✅ CORRECT: delta "standard delete: 200 + data envelope + destroys → 204 + empty body + moves to trash" (unconditional) → probe `delete "/api/v1/bookmarks` over the whole configured test-owned source set → hits in the destroy, response-format, authentication, pagination, scoping, and out-of-scope files → every hit example dispositioned; the response-format file's delete-response assertions become MODIFY/REMOVE rows even though the file is "about" response format, not deletion.
 - ❌ WRONG: the same delta "discovered" by reading the destroy file because its name matches the topic — the response-format file's delete-response assertions are never found, the plan ships incomplete, and the locked suite becomes unsatisfiable: those examples parse a response body the new contract leaves empty, so no implementation can green both them and the new delete tests.
 - ❌ WRONG: dispositioning a hit "KEEP — probably fine" with no reason, or skipping hits in a file because "it's about something else".
 
@@ -353,7 +358,7 @@ Before writing the plan document, verify ALL of the following. If any check fail
 11. **MODIFY consistency**: Test File headings marked MODIFY and the Planned State Changes table agree in both directions.
 12. **Removal reasons**: Every REMOVE row has a concrete reason traceable to the spec.
 13. **Delta completeness**: Every spec statement phrased as a change to existing behavior maps to a contract delta, and every delta has at least one request-boundary probe plus, where semantics change, at least one storage-boundary probe.
-14. **Sweep coverage**: Every probe was run over the entire test directory, and every hit example carries exactly one disposition — none silently dropped.
+14. **Sweep coverage**: Every probe was run over all configured test-owned source paths, and every hit example carries exactly one disposition — none silently dropped.
 15. **Disposition–table consistency**: Every MODIFY/REMOVE disposition has a matching Planned State Changes row, and every row either traces to a disposition or carries its own reason.
 16. **KEEP satisfiability**: No KEEP disposition's reason contradicts any delta's new contract — a KEEP that asserts the old contract is a plan error.
 17. **Landing legality**: Every entry's `(action, expected_landing)` pair is legal — MODIFY → failed|passed, REMOVE → pending, PIN → passed, TOUCH → unchanged — and every PIN's planned description equals, byte-for-byte, the example description its file's Describe Blocks section plans.

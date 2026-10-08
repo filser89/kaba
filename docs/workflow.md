@@ -50,10 +50,10 @@ The agent does the typing. The human does the thinking (what to test, what the c
 | 5 | `/kaba:acceptance-criteria` | Decompose spec into granular, test-oriented criteria | `FEATURE_DIR/acceptance-criteria.md` |
 | 6 | `/kaba:plan-tests` | Plan test organization — files, factories, helpers, criterion mapping, state-change allowlist. Also serves as the task list for implement-tests (no separate tasks step needed). | `FEATURE_DIR/test-plan.md` + `test-plan.json` |
 | 7 | Snapshot: capture baseline | Run test suite, save state to file | `FEATURE_DIR/snapshots/baseline.json` |
-| 8 | `/kaba:implement-tests` | Agent writes all test code following the test plan. Only test files. | Test files in the configured test directory |
+| 8 | `/kaba:implement-tests` | Agent writes all test code following the test plan. Only permitted test-session paths. | Tests and support files under configured ownership patterns |
 | 9 | Snapshot: capture post-test | Run test suite, save state to file | `FEATURE_DIR/snapshots/post-test.json` |
 | 10 | Snapshot: compare | Compare post-test vs baseline (see Snapshot Comparison Rules) | Pass/fail report |
-| 11 | Script: banned patterns | Automated scan — reject RSpec message expectations, any-instance mocking/stubbing, and `respond_to` matchers | Pass/fail |
+| 11 | Script: banned patterns | Runner-specific source quality — Go supported registrations/removal markers, or RSpec message-expectation/any-instance/`respond_to` bans | Pass/fail |
 | 12 | `/kaba:review-tests` | Agent review — "could a terrible implementation pass these tests?" | Structured findings report |
 | 13 | `/kaba:fix-tests` | *(optional — only on a NO-GO verdict)* Apply the review findings to the test files — mechanical fixes directly, escalated findings resolved with the human — then re-validate (snapshot + banned-pattern scan) | Updated test files + `FEATURE_DIR/test-fixes.md` |
 | 14 | Human review | Review test descriptions and agent findings. Final go/no-go. | Go/no-go |
@@ -63,23 +63,40 @@ The agent does the typing. The human does the thinking (what to test, what the c
 | Step | Command / Action | Purpose | Output |
 |------|-----------------|---------|--------|
 | 15 | `/kaba:plan-code` | Plan implementation informed by the locked tests — components, schema, decisions, build order | `FEATURE_DIR/code-plan.md` |
-| 16 | `/kaba:implement-code` | Agent writes code to make tests green. Cannot touch the test directory. | Implementation files |
+| 16 | `/kaba:implement-code` | Agent writes code to make feature tests green. Cannot touch test-owned files. | Implementation files |
 | 17 | Snapshot: capture post-impl | Run test suite, save state to file | `FEATURE_DIR/snapshots/post-impl.json` |
 | 18 | Snapshot: compare | Compare post-impl vs post-test (see Snapshot Comparison Rules) | Pass/fail report |
 | 19 | Gate: linter | The project's configured linter (`linter_command`) must pass; any suite-embedded checks (e.g. N+1 detection) ride along for free inside the same green `test_command` run | Pass/fail |
 
-Steps 17–19 run **inline inside `/kaba:implement-code`** as end gates (same pattern as implement-tests owning its snapshot steps), plus a fourth inline gate: the test directory must be untouched per version control. That remains defense in depth behind digest comparison, including examples whose digest cannot be resolved.
+Steps 17–19 run **inline inside `/kaba:implement-code`** as end gates (same pattern as implement-tests owning its snapshot steps), plus a fourth inline gate: `session-lock.sh check-dirty implement` must pass for all changed paths. Go snapshots also compare the complete protected file inventory, including ignored fixtures and helpers.
 
 #### Phase 4: Completion
 
 | Step | Command / Action | Purpose | Output |
 |------|-----------------|---------|--------|
 | 20 | `/kaba:architecture-diff` | Fold this feature's architectural delta into the doc | Updates `.kaba/architecture.md` |
-| 21 | Script: `$(git config kaba.scriptdir)/cleanup-tests.sh` | *(optional — only when the feature had REMOVE entries)* Delete tests skip-marked REMOVED by the feature; self-verifying with rollback; human reviews the deletion diff | Updated test files |
+| 21 | Script: `$(git config kaba.scriptdir)/cleanup-tests.sh` | *(when the feature has removals or scaffolds)* Delete exact tests marked REMOVED and recorded completed-feature scaffold sources; self-verifying with rollback; human reviews the deletion diff | Updated test files |
 
 #### Outside the pipeline: `/kaba:research`
 
 `/kaba:research` is deliberately **not** a step in this workflow. It is an optional, human-triggered decision-support command: when the human needs more information to make a decision — at any phase — it investigates one open question for the current feature and appends a recommendation to `FEATURE_DIR/research-log.md`. Its output informs the human only; no workflow command reads it.
+
+### Runner contracts
+
+Read [runner and ownership contracts](test-runners.md) for source forms, identity syntax,
+criterion comments, scaffold restrictions, and cleanup. Go uses
+`IMPORT_PATH::TestName/subtest`; RSpec uses positional example addresses. Go capture
+requires all source-discovered cases and parents to produce complete runtime outcomes;
+compilation errors and hidden cases invalidate capture. Package/build context must stay
+consistent across snapshots. Only post-test enables validated overlays; post-implementation
+uses real code. Any overlay-assisted capture rejects PINs. Test-owned Go helpers, fixtures,
+and scaffolds remain protected through implementation even when Git ignores them.
+
+The structural Go quality scan runs in the red test phase without executing the aggregate
+quality command. The configured `linter_command` must succeed at implementation completion
+and cleanup eligibility. It may include project-specific assertions, integration checks,
+formatting, static analysis, vulnerability checks, and race detection. A failure blocks
+completion; the session lock stays armed.
 
 ### Snapshot Comparison Rules
 
@@ -101,6 +118,11 @@ Snapshots record the state (passed/failed/pending) and a formatting-insensitive 
 | Any test → pending, unallowlisted | Never | A test was switched off without a REMOVE entry |
 
 The allowlist is `FEATURE_DIR/test-plan.json` (schema v3): `{action, expected_landing}` entries over MODIFY/REMOVE/PIN/TOUCH. `plan-tests` generates it whole from the Planned State Changes table; `validate-plan` checks it against the baseline and writes `snapshots/test-plan.lock.json`. A group address covers every example under it for id-based actions; PIN matches an exact file + planned full description. During fix-tests, a human-approved escalation may add only a provenance-stamped TOUCH or MODIFY through `allowlist-append`; compare rejects every other in-session plan edit. Unused MODIFY/TOUCH and unfulfilled PIN entries surface as warnings; an unexecuted REMOVE is a violation.
+
+Successful Go post-test comparison also records the implementation's required passing
+identities: new tests and tests covered by MODIFY entries. Post-implementation comparison
+uses this validated set to reject incomplete feature implementations while preserving
+the status of unrelated baseline failures.
 
 #### Post-Implementation (snapshot 3 vs post-test)
 
@@ -126,17 +148,17 @@ The snapshot script (`$(git config kaba.scriptdir)/snapshot-tests.sh`) is called
 | `compare post-test` | `/kaba:implement-tests`; `/kaba:fix-tests` | End — immediately after post-test capture; snapshots and allowlist resolved from the feature dir |
 | `capture post-impl` | `/kaba:implement-code` | End — after all implementation code is written |
 | `compare post-impl` | `/kaba:implement-code` | End — immediately after post-impl capture |
-| `cleanup-tests.sh` (own script) | Human-triggered, between features | Deletes skip-marked REMOVED tests; self-verifying with rollback |
+| `cleanup-tests.sh` (own script) | Human-triggered, between features | Deletes marked tests and recorded Go scaffolds; verifies identities and real suite with exact rollback |
 
 ### Mechanical Enforcement vs. Prompt-Held Rules
 
 | Concern | Enforcement | Mechanism |
 |---------|-------------|-----------|
 | No implementation code in test session | Real-time hook + git boundary | Session lock (`test` mode): PreToolUse guard blocks agent edits to implementation paths in real time; pre-commit rejects staged implementation paths |
-| No test changes in implementation session | Real-time hook + git boundary + inline end gate | Session lock (`implement` mode): PreToolUse guard blocks agent edits to the test directory in real time; pre-commit rejects staged test paths; test-directory-untouched end gate in `implement-code` |
-| No banned RSpec patterns | Inline script gate | `$(git config kaba.scriptdir)/banned-patterns.sh`, pass/fail |
+| No test changes in implementation session | Real-time hook + git boundary + inline end gate | Session lock (`implement` mode): PreToolUse guard blocks test-owned edits; pre-commit rejects forbidden staged paths; classifier-based ownership end gate in `implement-code` |
+| Runner-specific test source quality | Inline script gate | `$(git config kaba.scriptdir)/banned-patterns.sh`, pass/fail |
 | Snapshot comparison rules | Inline script gate | `snapshot-tests.sh`, invoked by the owning skill, pass/fail |
-| Linter compliance | Inline command gate | The project's configured `linter_command` (`.kaba/config.yml`), pass/fail |
+| Project quality command | Inline command gate | The project's configured `linter_command` at implementation completion (`.kaba/config.yml`), nonzero exit blocks completion |
 | N+1 query detection (if the suite has it, e.g. Prosopite) | Test-suite gate | Rides along inside the `test_command` green run, pass/fail |
 | Test plan criterion coverage | Prompt | Agent follows test plan structure |
 | Code architecture decisions | Prompt | Agent follows implementation plan |
@@ -195,7 +217,13 @@ because it is.
 The two-session boundary is enforced by a lock with one state file and one rule engine, consumed by two hooks:
 
 - **State**: `.kaba/session-lock` (git-ignored) holds `test` or `implement`; absent = unrestricted. `/kaba:implement-tests` sets `test` at its start; `/kaba:implement-code` sets `implement` at its start and clears the lock after all end gates pass — a completed feature leaves the repo unrestricted, so the lock is armed only between the test session and the end of the implementation session. Manual override: `$(git config kaba.scriptdir)/session-lock.sh status|clear`.
-- **Rules** (complement of `test_dir`, derived from `.kaba/config.yml`, in `session-lock.sh check`): `implement` may write everything **except** `test_dir`; `test` may write **only** `test_dir`, `feature_dir`, and the configured `test_writable` carve-outs. The rule is a complement, not a hand-maintained deny-list of implementation territory — nothing project-specific needs to be kept in sync as the codebase grows.
+- **Rules** (`.kaba/config.yml`, through `path-permissions.sh`): explicit configurations
+  use independent allow/exclude lists for `test` and `implement`; exclusions win per
+  session. Shared paths are writable in both; neither-owned paths are denied in both.
+  Legacy RSpec configurations permit `test_dir`, `feature_dir`, and literal
+  `test_writable` in test mode and everything except `test_dir` in implementation mode.
+  Classifier checks cover future/deleted files, symlink lexical/resolved permissions,
+  staged/unstaged/untracked changes, and both rename endpoints.
 - **PreToolUse guard** (`hooks/hooks.json`, self-registered by the plugin): blocks Claude's direct-path edit tools and every declared path in a Codex `apply_patch` call, giving real-time feedback before path-declaring edits.
 - **SessionStart rewire** (same file): re-points `kaba.scriptdir` at the plugin copy that is actually running. `/kaba:init` or `$kaba:init` pins that path absolutely, and a marketplace install puts the version in it, so every version bump would otherwise strand it — leaving new skill text calling scripts out of the old directory. It resolves Claude's project environment or Codex's `cwd` payload, fails open in any repo without `.kaba/config.yml`, and never pins at a scripts directory that does not exist.
 - **Pre-commit hook** (`.kaba/hooks/pre-commit`, installed into the consumer repo by `/kaba:init`): validates staged paths at the commit boundary via `core.hooksPath`. (`--no-verify` can bypass — guardrail, not security.)

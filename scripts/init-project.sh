@@ -8,9 +8,18 @@ SCRIPT_DIR="$(CDPATH="" cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 test_dir=""; test_command=""; feature_dir=""; linter_command=""
 test_writable=""; rules_files=""; runner_artifacts=""; force=""
+test_runner=""; explicit=""
+test_write_allow=(); test_write_exclude=(); implement_write_allow=(); implement_write_exclude=()
+seen_test_allow=""; seen_test_exclude=""; seen_implement_allow=""; seen_implement_exclude=""
 
 while [ $# -gt 0 ]; do
+  [ "$#" -gt 1 ] || [ "$1" = --force ] || kaba_die "missing value for $1"
   case "$1" in
+    --test-runner) test_runner="$2"; shift 2 ;;
+    --test-write-allow) explicit=1; seen_test_allow=1; [ -z "$2" ] || test_write_allow+=("$2"); shift 2 ;;
+    --test-write-exclude) explicit=1; seen_test_exclude=1; [ -z "$2" ] || test_write_exclude+=("$2"); shift 2 ;;
+    --implement-write-allow) explicit=1; seen_implement_allow=1; [ -z "$2" ] || implement_write_allow+=("$2"); shift 2 ;;
+    --implement-write-exclude) explicit=1; seen_implement_exclude=1; [ -z "$2" ] || implement_write_exclude+=("$2"); shift 2 ;;
     --test-dir)         test_dir="$2"; shift 2 ;;
     --test-command)     test_command="$2"; shift 2 ;;
     --feature-dir)      feature_dir="$2"; shift 2 ;;
@@ -23,18 +32,23 @@ while [ $# -gt 0 ]; do
   esac
 done
 
-for pair in "test_dir:$test_dir" "test_command:$test_command" \
+for pair in "test_command:$test_command" \
             "feature_dir:$feature_dir" "linter_command:$linter_command"; do
   [ -n "${pair#*:}" ] || kaba_die "missing required argument --${pair%%:*}"
 done
 
 slash() { case "$1" in */) printf '%s' "$1" ;; *) printf '%s/' "$1" ;; esac; }
-test_dir="$(slash "$test_dir")"; feature_dir="$(slash "$feature_dir")"
-
-# Validate BEFORE writing anything, so a rejected run leaves no partial state.
-case "$feature_dir" in "$test_dir"*) kaba_die "feature_dir '$feature_dir' is a prefix-path of test_dir '$test_dir'" ;; esac
-case "$test_dir" in "$feature_dir"*) kaba_die "test_dir '$test_dir' is a prefix-path of feature_dir '$feature_dir'" ;; esac
-
+feature_dir="$(slash "$feature_dir")"
+if [ -n "$explicit" ]; then
+  [ -z "$test_dir$test_writable" ] || kaba_die 'cannot mix legacy test_dir/test_writable with explicit permissions'
+  [ -n "$test_runner" ] || kaba_die 'explicit permissions require --test-runner'
+  for seen in "$seen_test_allow" "$seen_test_exclude" "$seen_implement_allow" "$seen_implement_exclude"; do
+    [ -n "$seen" ] || kaba_die 'explicit permissions require all four allow/exclude lists (use an empty value for empty exclusions)'
+  done
+else
+  [ -n "$test_dir" ] || kaba_die 'missing required argument --test-dir'
+  test_dir="$(slash "$test_dir")"
+fi
 root="$(kaba_repo_root)"
 
 # Never silently clobber: the config may carry hand edits (supported), and an
@@ -47,20 +61,37 @@ if [ -d "$fdir" ] && [ -n "$(ls -A "$fdir")" ] && [ -z "$force" ]; then
   kaba_die "$fdir exists and is not empty — if another tool owns it (Cucumber?), choose a different feature_dir; pass --force to adopt it"
 fi
 
-mkdir -p "$root/.kaba" "$fdir"
-
 fmt_list() { printf '[%s]' "$(printf '%s' "$1" | sed 's/,[[:space:]]*/, /g')"; }
 
+yaml_scalar() { printf '"%s"' "$(printf '%s' "$1" | sed 's/\\/\\\\/g; s/"/\\"/g')"; }
+write_list() {
+  local key="$1"; shift
+  if [ "$#" -eq 0 ]; then printf '%s: []\n' "$key"; return; fi
+  printf '%s:\n' "$key"
+  for value in "$@"; do printf '  - %s\n' "$(yaml_scalar "$value")"; done
+}
+# Validate the candidate through the same loader before mutating the project.
+candidate="$(mktemp -d "${TMPDIR:-/tmp}/kaba-init.XXXXXX")"
+trap 'rm -rf "$candidate"' EXIT
+mkdir -p "$candidate/.kaba"
 {
-  echo "# .kaba/config.yml — written by /kaba:init"
-  printf 'test_dir:       %s\n' "$test_dir"
-  printf 'test_command:   %s\n' "$test_command"
-  printf 'feature_dir:    %s\n' "$feature_dir"
-  # if-form, not `[ … ] && printf` — the && short-circuit returns 1 under set -e.
-  if [ -n "$test_writable" ]; then printf 'test_writable:  %s\n' "$(fmt_list "$test_writable")"; fi
-  printf 'linter_command: %s\n' "$linter_command"
+  echo "# .kaba/config.yml"
+  if [ -n "$test_runner" ]; then printf 'test_runner: %s\n' "$(yaml_scalar "$test_runner")"; fi
+  if [ -n "$explicit" ]; then
+    write_list test_write_allow "${test_write_allow[@]+"${test_write_allow[@]}"}"
+    write_list test_write_exclude "${test_write_exclude[@]+"${test_write_exclude[@]}"}"
+    write_list implement_write_allow "${implement_write_allow[@]+"${implement_write_allow[@]}"}"
+    write_list implement_write_exclude "${implement_write_exclude[@]+"${implement_write_exclude[@]}"}"
+  else
+    printf 'test_dir:       %s\n' "$test_dir"
+    if [ -n "$test_writable" ]; then printf 'test_writable:  %s\n' "$(fmt_list "$test_writable")"; fi
+  fi
+  printf 'test_command:   %s\n' "$(yaml_scalar "$test_command")"
+  printf 'feature_dir:    %s\n' "$(yaml_scalar "$feature_dir")"
+  printf 'linter_command: %s\n' "$(yaml_scalar "$linter_command")"
   if [ -n "$rules_files" ]; then printf 'rules_files:    %s\n' "$(fmt_list "$rules_files")"; fi
-} > "$root/.kaba/config.yml"
+} > "$candidate/.kaba/config.yml"
+(kaba_repo_root() { printf '%s\n' "$candidate"; }; kaba_load_config)
 
 # Hooks are a committed shim, never a path into the plugin install: a relocated
 # plugin must fail loudly at the shim, not silently via a dangling hooksPath (D10).
@@ -68,6 +99,9 @@ existing_hooks="$(git -C "$root" config core.hooksPath 2>/dev/null || true)"
 if [ -n "$existing_hooks" ] && [ "$existing_hooks" != ".kaba/hooks" ] && [ -z "$force" ]; then
   kaba_die "core.hooksPath is already '$existing_hooks' (husky/lefthook?) — integrate by hand, or pass --force to take it over"
 fi
+
+mkdir -p "$root/.kaba" "$fdir"
+cp "$candidate/.kaba/config.yml" "$root/.kaba/config.yml"
 
 mkdir -p "$root/.kaba/hooks"
 cp "$SCRIPT_DIR/hooks/pre-commit" "$root/.kaba/hooks/pre-commit"

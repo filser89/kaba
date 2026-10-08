@@ -4,6 +4,8 @@
 
 ### Added
 
+- Go testing support with explicit session permissions, stable named-case snapshots, validated post-test compilation scaffolds, protected test-support files, source quality checks, and verified between-feature cleanup. Go projects require Go; RSpec projects retain Ruby/Prism and legacy configuration without migration.
+
 - Added installable Codex packaging, explicit-only skill metadata, and Codex `apply_patch` enforcement while keeping the existing Claude package and marketplace.
 
 ### Changed

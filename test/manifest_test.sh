@@ -63,3 +63,10 @@ while IFS= read -r rel; do
   assert_file_exists "NOTICE path $rel exists" "$SCRIPT_DIR/../$rel"
 done < <(grep -oE '[A-Za-z0-9_-]+(/[A-Za-z0-9_-]+)*\.md' "$SCRIPT_DIR/../NOTICE" | sort -u)
 assert_eq "NOTICE still attributes 2 vendored files" "2" "$notice_paths"
+
+# Both plugin roots ship each runtime branch and its disclosed skill reference.
+for rel in scripts/test-runner.sh scripts/path-permissions.sh scripts/adapters/rspec.sh scripts/adapters/go.sh scripts/go/go.mod scripts/go/main.go scripts/go/inventory.go scripts/go/support.go scripts/go/quality.go docs/test-runners.md; do
+  assert_file_exists "packaged runner component $rel" "$ROOT/$rel"
+done
+assert_stdout_match 'package advertises both supported runners' 'Rails/RSpec and Go' printf '%s' "$p_dsc"
+assert_ok 'Codex interface includes Go capability' jq -e '.interface.capabilities | index("Go") != null' "$C/plugin.json"

@@ -98,53 +98,8 @@ resolve_feature_dir() {
 # on nothing, and an identity listing would be partial — a plan authored or
 # validated against it has silent gaps. Fail loudly instead. A legitimate empty
 # suite (0 examples, 0 load errors) still passes.
-run_rspec_json() {
-  local dry_run="$1"
-  require_test_command
-
-  RSPEC_TMPFILE=$(mktemp "${TMPDIR:-/tmp}/rspec-json.XXXXXX")
-
-  local rspec_exit=0
-  if [[ "$dry_run" == "true" ]]; then
-    # Dry run feeds machine consumers (identities) — the runner's own stdout must
-    # not pollute the mode's JSON output. No progress formatter, stdout discarded.
-    (cd "$KABA_REPO_ROOT" && $KABA_TEST_COMMAND --dry-run --format json --out "$RSPEC_TMPFILE" >/dev/null) || rspec_exit=$?
-  else
-    (cd "$KABA_REPO_ROOT" && $KABA_TEST_COMMAND --format json --out "$RSPEC_TMPFILE" --format progress) || rspec_exit=$?
-  fi
-
-  if [[ ! -f "$RSPEC_TMPFILE" ]] || ! jq -e '.examples' "$RSPEC_TMPFILE" >/dev/null 2>&1; then
-    kaba_die "RSpec failed to produce valid JSON"
-  fi
-
-  local errors_outside
-  errors_outside=$(jq '.summary.errors_outside_of_examples_count // 0' "$RSPEC_TMPFILE")
-  if [[ "$errors_outside" -gt 0 ]]; then
-    echo "[snapshot] RSpec reported $errors_outside error(s) outside of examples — spec files failed to load." >&2
-    echo "[snapshot] No output was produced. Re-run the suite to see the load errors:" >&2
-    echo "    (cd \"$KABA_REPO_ROOT\" && $KABA_TEST_COMMAND)" >&2
-    kaba_die "aborting due to load errors (errors_outside_of_examples_count=$errors_outside)"
-  fi
-}
-
-# Joins a content digest onto every captured example. Hard dependency: ruby 3.3+
-# with Prism — a digest gate that silently doesn't fire is worse than no gate,
-# so absence or failure of the pass aborts the capture.
-run_digest_pass() {
-  command -v ruby >/dev/null 2>&1 \
-    || kaba_die "ruby is required for snapshot digests (ruby 3.3+ with the Prism gem)"
-  DIGEST_TMPFILE=$(mktemp "${TMPDIR:-/tmp}/digests.XXXXXX")
-  local spec_files
-  spec_files=$(jq -r '[.examples[].file_path] | unique | .[]' "$RSPEC_TMPFILE")
-  if [[ -z "$spec_files" ]]; then
-    : > "$DIGEST_TMPFILE"
-    return 0
-  fi
-  if ! (cd "$KABA_REPO_ROOT" && printf '%s\n' "$spec_files" | tr '\n' '\0' \
-        | xargs -0 ruby "$SCRIPT_DIR/ruby/digest_examples.rb" > "$DIGEST_TMPFILE"); then
-    kaba_die "digest pass failed — ruby 3.3+ with Prism is required, and every spec file must parse (see stderr above)"
-  fi
-}
+. "$SCRIPT_DIR/adapters/rspec.sh"
+. "$SCRIPT_DIR/protected-tests.sh"
 
 run_capture() {
   local name="$1"
@@ -161,10 +116,23 @@ run_capture() {
   # keep the existing baseline. Test directory comes from config ($KABA_TEST_DIR),
   # same as session-lock.sh.
   if [[ "$name" == "baseline" && -f "$snapshot_file" ]]; then
-    if [[ -n "$(git -C "$KABA_REPO_ROOT" status --porcelain -- "$KABA_TEST_DIR" 2>/dev/null)" ]]; then
-      echo "[snapshot] Resume mode: test directory has in-progress work — existing baseline preserved."
+    local dirty_status=0
+    kaba_dirty_test_work || dirty_status=$?
+    [[ "$dirty_status" -ne 2 ]] || kaba_die 'cannot inspect classified dirty test paths'
+    if [[ "$dirty_status" -eq 1 ]] && jq -e '(.protected_files|type)=="array"' "$snapshot_file" >/dev/null; then
+      local protected_now
+      protected_now="$(kaba_protected_inventory)" || kaba_die 'cannot inspect protected resume inventory'
+      jq -e --argjson current "$protected_now" '.protected_files == $current' "$snapshot_file" >/dev/null || dirty_status=0
+    fi
+    if [[ "$dirty_status" -eq 0 ]]; then
+      echo "[snapshot] Resume mode: test-owned paths have in-progress work — existing baseline preserved."
       return 0
     fi
+  fi
+
+  if [[ "${KABA_TEST_RUNNER:-rspec}" == go ]]; then
+    run_go_capture "$name" "$snapshot_dir" "$snapshot_file"
+    return
   fi
 
   mkdir -p "$snapshot_dir"
@@ -234,7 +202,71 @@ run_capture() {
       }
     }' > "$snapshot_file"
 
+  attach_protected_inventory "$snapshot_file"
   print_capture_summary "$name" "$snapshot_file" "$total" "$passed" "$failed" "$pending"
+}
+
+run_go_capture() {
+  local name="$1" snapshot_dir="$2" snapshot_file="$3" commit branch captured_at
+  case "$name" in baseline|post-test|post-impl) ;; *) kaba_die 'Go captures require phase baseline, post-test, or post-impl' ;; esac
+  mkdir -p "$snapshot_dir"
+  RSPEC_TMPFILE="$(mktemp "${TMPDIR:-/tmp}/go-results.XXXXXX")"
+  FEATURE_DIR="$FEATURE_DIR" "$SCRIPT_DIR/test-runner.sh" run --phase "$name" > "$RSPEC_TMPFILE" || return 1
+  commit=$(git -C "$KABA_REPO_ROOT" rev-parse --short HEAD 2>/dev/null || echo "")
+  branch=$(git -C "$KABA_REPO_ROOT" rev-parse --abbrev-ref HEAD 2>/dev/null || echo "")
+  captured_at=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+  jq --arg captured_at "$captured_at" --arg branch "$branch" --arg commit "$commit" --arg feature "$(basename "$FEATURE_DIR")" --arg name "$name" '
+    {version:2,runner:.runner,runner_schema:.schema,context:.context,groups:.groups,overlay_packages:.overlay_packages,scaffolds:.scaffolds,
+     metadata:{captured_at:$captured_at,branch:$branch,commit:$commit,feature:$feature,name:$name},examples:.examples,
+     summary:{total:(.examples|length),passed:([.examples[]|select(.status=="passed")]|length),failed:([.examples[]|select(.status=="failed")]|length),pending:([.examples[]|select(.status=="pending")]|length)}}' "$RSPEC_TMPFILE" > "$snapshot_file"
+  attach_protected_inventory "$snapshot_file"
+  print_capture_summary "$name" "$snapshot_file" "$(jq '.summary.total' "$snapshot_file")" "$(jq '.summary.passed' "$snapshot_file")" "$(jq '.summary.failed' "$snapshot_file")" "$(jq '.summary.pending' "$snapshot_file")"
+}
+
+attach_protected_inventory() {
+  local file="$1" inventory temp
+  inventory="$(kaba_protected_inventory)" || kaba_die 'protected test file inventory failed'
+  temp="$(mktemp "${TMPDIR:-/tmp}/kaba-snapshot.XXXXXX")"
+  jq --argjson inventory "$inventory" '. + {protected_files:$inventory}' "$file" > "$temp" || return 1
+  mv "$temp" "$file"
+}
+
+persist_scaffold_manifest() {
+  local file="$1" records temp
+  records="$(mktemp "${TMPDIR:-/tmp}/kaba-scaffold-records.XXXXXX")"
+  jq '.scaffolds // []' "$file" > "$records"
+  kaba_validate_scaffolds "$records" "$(basename "$FEATURE_DIR")"
+  if [[ -f "$FEATURE_DIR/snapshots/scaffolds.json" ]]; then
+    if jq -e --arg feature "$(basename "$FEATURE_DIR")" --slurpfile records "$records" '
+      .version==1 and .feature==$feature and .files==$records[0]' "$FEATURE_DIR/snapshots/scaffolds.json" >/dev/null; then
+      rm -f "$records"
+      return 0
+    fi
+    if [[ "${KABA_CLEANUP_COMPARE:-false}" == true ]]; then
+      rm -f "$records"
+      kaba_die 'existing scaffold manifest differs from validated capture'
+    fi
+  fi
+  [[ "${KABA_CLEANUP_COMPARE:-false}" != true ]] || { rm -f "$records"; return 0; }
+  temp="$(mktemp "$FEATURE_DIR/snapshots/.scaffolds.XXXXXX")"
+  jq -n --arg feature "$(basename "$FEATURE_DIR")" --slurpfile files "$records" '{version:1,feature:$feature,files:$files[0]}' > "$temp"
+  mv "$temp" "$FEATURE_DIR/snapshots/scaffolds.json"
+  rm -f "$records"
+}
+
+# Only a validated post-test comparison can distinguish feature work from
+# unrelated failures already present in the baseline.
+persist_go_completion_targets() {
+  local baseline="$1" post_test="$2" entries="$3" temp
+  [[ "${KABA_CLEANUP_COMPARE:-false}" != true ]] || return 0
+  temp="$(mktemp "${TMPDIR:-/tmp}/kaba-completion.XXXXXX")" || return 1
+  jq --slurpfile baseline "$baseline" --argjson entries "$entries" "$JQ_ENTRY_MATCHES"'
+    ($baseline[0].examples | map(.id)) as $existing |
+    .implementation_required = [.examples[] | . as $example |
+      select(($existing | index($example.id)) == null or
+        any($entries[]; .action == "MODIFY" and entry_matches(.; $example.id))) | .id]' \
+    "$post_test" > "$temp" || { rm -f "$temp"; return 1; }
+  mv "$temp" "$post_test"
 }
 
 print_capture_summary() {
@@ -267,6 +299,12 @@ print_capture_summary() {
 # Dry-run identity listing: the only legal source for allowlist addresses and
 # descriptions. No snapshot is written; output goes to stdout.
 run_identities() {
+  if [[ "${KABA_TEST_RUNNER:-rspec}" == go ]]; then
+    RSPEC_TMPFILE="$(mktemp "${TMPDIR:-/tmp}/go-identities.XXXXXX")"
+    "$SCRIPT_DIR/test-runner.sh" identities --phase baseline > "$RSPEC_TMPFILE" || return 1
+    jq '.examples | map({id,full_description,file_path})' "$RSPEC_TMPFILE"
+    return
+  fi
   run_rspec_json true
   jq '[.examples[] | {id, full_description, file_path}]' "$RSPEC_TMPFILE"
 }
@@ -276,7 +314,9 @@ run_identities() {
 # or the entry id is a group address and the example sits under it — the trailing
 # "]" is swapped for ":" so "[1:2]" matches "[1:2:3]" but never "[1:20:1]".
 JQ_ENTRY_MATCHES='def entry_matches($e; $exid):
-  ($exid == $e.id) or ($exid | startswith(($e.id | rtrimstr("]")) + ":"));'
+  ($exid == $e.id) or
+  (if ($e.id | contains("::")) then ($exid | startswith($e.id + "/"))
+   else ($exid | startswith(($e.id | rtrimstr("]")) + ":")) end);'
 
 require_snapshot_v2() {
   local snapshot_file="$1" snapshot_version
@@ -327,7 +367,7 @@ run_validate_plan() {
       elif $e.action == "PIN" then
         (if ($e | has("id")) then
           {id: $e.file, error: "PIN entries carry no id — the example does not exist yet"}
-        elif (($e.file // "") | startswith("./") | not) then
+        elif (($base[0].runner // "rspec") == "rspec" and (($e.file // "") | startswith("./") | not)) then
           {id: ($e.file // "missing"), error: "PIN file must use the RSpec file_path form with leading ./"}
         elif ([ $bex[] | select(.file_path == $e.file and .full_description == $e.description) ] | length) > 0 then
           {id: $e.file, error: "PIN matches an existing baseline example — pinning an existing example is a plan error (use TOUCH or MODIFY): \($e.description | tojson)"}
@@ -501,6 +541,23 @@ run_compare() {
   for f in "$before_file" "$after_file"; do
     require_snapshot_v2 "$f"
   done
+  local before_runner after_runner
+  before_runner=$(jq -r '.runner // "rspec"' "$before_file")
+  after_runner=$(jq -r '.runner // "rspec"' "$after_file")
+  [[ "$before_runner" == "$after_runner" ]] || kaba_die 'snapshot runner mismatch'
+  if [[ "$before_runner" == go ]]; then
+    jq -en --slurpfile before "$before_file" --slurpfile after "$after_file" '$before[0].runner_schema == 1 and $after[0].runner_schema == 1 and $before[0].context != null and $before[0].context == $after[0].context' >/dev/null || kaba_die 'Go snapshot format/build context mismatch'
+  fi
+
+  if [[ "$mode" == post-impl && "$before_runner" == go ]]; then
+    jq -en --slurpfile before "$before_file" --slurpfile after "$after_file" '
+      ($before[0].protected_files|type)=="array" and ($after[0].protected_files|type)=="array" and
+      $before[0].protected_files==$after[0].protected_files' >/dev/null || kaba_die 'protected test inventory changed or missing during implementation'
+    jq -en --slurpfile before "$before_file" --slurpfile after "$after_file" '
+      ($before[0].examples|map({id,digest})|sort_by(.id))==($after[0].examples|map({id,digest})|sort_by(.id))' >/dev/null || kaba_die 'Go test content changed during implementation (digest drift)'
+    jq -e '(.implementation_required|type)=="array" and all(.implementation_required[]; type=="string")' "$before_file" >/dev/null \
+      || kaba_die 'Go implementation targets missing — validate with compare post-test before implementation'
+  fi
 
   # The allowlist is required in post-test mode — absence is an error, never a meaning.
   local entries="[]"
@@ -550,7 +607,9 @@ run_compare() {
       [$new_examples[] | . as $nx |
         ([$entries[] | select(.action == "PIN" and .file == $nx.file_path and .description == $nx.full_description)] | length > 0) as $is_pin |
         if $is_pin then
-          (if $nx.status == "passed" then empty
+          (if ($after[0].runner // "rspec") == "go" and (($after[0].overlay_packages // []) | length) > 0 then
+             {id:$nx.id,description:$nx.full_description,reason:"PIN requires overlay-free proof; capture uses scaffolding"}
+           elif $nx.status == "passed" then empty
            else {id: $nx.id, description: $nx.full_description, reason: "allowlisted PIN must land passed, got \($nx.status)"}
            end)
         else
@@ -597,7 +656,14 @@ run_compare() {
       [$removed_examples[] | {id: .id, description: .full_description, reason: "test was removed (in-session deletion is never allowed; removals are skip-marked)"}]
     elif $mode == "post-impl" then
       [$new_examples[] | {id: .id, description: .full_description, reason: "new test added during implementation"}] +
-      [$changed_examples[] | select(.before_status != "failed" or .after_status != "passed") |
+      [$after[0].examples[] | . as $example |
+        select(($before[0].runner // "rspec") == "go" and
+          (($before[0].implementation_required // []) | index($example.id)) != null and .status != "passed") |
+        {id:.id,description:.full_description,reason:"feature test must pass before implementation completes"}] +
+      [$changed_examples[] | . as $change |
+        select(.before_status != "failed" or .after_status != "passed" or
+          (($before[0].runner // "rspec") == "go" and
+            (($before[0].implementation_required // []) | index($change.id)) == null)) |
         (if .before_status == "passed" and .after_status == "failed" then "regression: was passing, now failing"
          else "unexpected transition: \(.before_status) → \(.after_status)"
          end) as $reason |
@@ -645,11 +711,17 @@ run_compare() {
       unchanged_counts: $unchanged_counts
     }')
 
-  print_compare_result "$result" "$before_name" "$after_name" "$mode"
-
   local verdict
   verdict=$(echo "$result" | jq -r '.verdict')
-  [[ "$verdict" == "PASS" ]] && return 0 || return 1
+  if [[ "$verdict" == PASS ]]; then
+    if [[ "$mode" == post-test && "$before_runner" == go ]]; then
+      [[ -n "${FEATURE_DIR:-}" ]] || FEATURE_DIR="$(dirname "$(dirname "$after_file")")"
+      persist_scaffold_manifest "$after_file"
+      persist_go_completion_targets "$before_file" "$after_file" "$entries"
+    fi
+  fi
+  print_compare_result "$result" "$before_name" "$after_name" "$mode"
+  [[ "$verdict" == PASS ]]
 }
 
 print_compare_result() {

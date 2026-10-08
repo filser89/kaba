@@ -85,6 +85,9 @@ applicable, cleanup, and end gates. Its effective classifications are:
 | No | No | Neither |
 
 The test-owned file set comes from this classifier, not a third configurable list.
+Snapshots protect every test-owned file, including ignored fixtures and scaffolds.
+Shared files are writable during implementation and are outside that immutable inventory;
+shared feature artifacts therefore do not recursively enter their own snapshots.
 Workflow artifacts and shared files retain existing skill-level restrictions.
 General artifact-locking and permission-freezing changes are outside scope.
 
@@ -123,12 +126,20 @@ table-case tests; unaccounted parent/package failures still block validation.
   digest; changed shared test-body/setup code affects the cases using it.
 - Preserve compiler-relevant source information when computing digests; comments that
   affect compilation are not ordinary formatting.
+- Include referenced test-owned ordinary Go declarations and methods on referenced fake
+  types, including methods invoked through interfaces. Executable-wide initialization
+  and `TestMain` affect both internal and external tests. Imported test-owned support
+  contributes active source conservatively at package granularity, including transitive
+  imports. Production bodies and build-excluded files do not enter test digests.
 
 Go snapshots also record the path/content inventory of all test-owned files, including
 helpers, fixtures, and scaffolding. Post-test to post-implementation checks protect the
 entire set from changes, additions, deletions, and renames. During test writing, normal
 planned edits remain possible; do not impose whole-tree immutability across that phase.
 The Git end gate remains as an independent check using the same classifier.
+Successful post-test comparison persists the new and MODIFY test identities that must
+pass at implementation completion. Post-implementation comparison requires that validated
+target set and preserves unrelated baseline failures.
 
 ## Compilation scaffolding
 
@@ -160,6 +171,9 @@ Keep the existing skip-now/delete-between-features process. Go uses the removal 
 Source-aware cleanup deletes the exact marked function or table row, never an entire
 loop to remove one case. Use the supported source structure to identify the deletion;
 ambiguous or unsupported forms fail explicitly.
+Remove newly unused imports using bindings from the original compiling package and the
+selected toolchain/build tags. Preserve retained source bytes, side-effect imports,
+aliases, and compiler directives.
 
 Extend the existing between-feature cleanup command to remove completed-feature
 scaffolding. Scripts perform all four operations: verify completion/lock-off, delete
@@ -187,26 +201,59 @@ running RSpec-only expressions over zero Go files is not a valid quality check.
 Ordinary assertions, test doubles, local HTTP stubs, and fixtures must remain usable
 under the project's conventions.
 
-## Evidence and limits
+## Execution contracts
 
-A disposable experiment used Go 1.27.0 on darwin/arm64 outside both repositories.
-It demonstrated virtual missing declarations, named red cases, unchanged tests turning
-green against real implementation without overlays, additive methods, script-generated
-field additions, stable names under reordering/parallel execution, and scripted cleanup
-with exact restoration after a nonzero verification result.
+- Runner operations receive an explicit phase: `baseline`, `post-test`, `post-impl`, or
+  `cleanup`. Only `post-test` enables validated scaffolding. User-supplied overlays are
+  rejected; discovery, execution, and digests use the same package/build context.
+- A PIN needs a passing result against real code without overlays. Any PIN in an
+  overlay-assisted capture is rejected with an actionable diagnostic, including PINs
+  in packages that depend indirectly on scaffolding. Independent PIN-package proof and
+  isolated PIN extraction are outside this capability. This conservative restriction
+  also blocks otherwise valid PINs alongside unrelated scaffold-dependent packages.
+- Supported table cases use literal names in literal struct slices, either directly in
+  a range expression or assigned to a local variable. Each range registers its row with
+  `t.Run(tc.name, ...)`. Literal nested subtests are supported. Dynamic registrations,
+  duplicate runtime names, and unenumerable cases fail explicitly.
+- A removable table can carry a per-row `removedBy` string and a shared callback check:
+  `if tc.removedBy != "" { t.Skip("REMOVED by " + tc.removedBy) }`. Adding the shared check
+  to an existing table is a shared-body change requiring planned TOUCH/MODIFY coverage
+  for affected cases. Marking one row changes that row's digest only. A parent skip that
+  prevents expected children from running is an incomplete run, never synthetic child skips.
+- Symlink permission checks require permission for both the lexical path and its resolved
+  target. Apply the conservative intersection to writes, deletions, and both move endpoints.
+  Reject dangling/cyclic links and outside targets while a session lock is active. Git
+  deletion checks retain old entry classification even when the working-tree leaf is absent.
+- Successful post-test comparison records feature-linked scaffolds with relative paths,
+  hashes, and target packages, and refreshes this manifest after valid test-review edits.
+  Scaffold manifests are deletion records, never permission lists. Cleanup comparison
+  rejects a mismatched manifest without refreshing it.
+  Cleanup refuses changed files, unsafe paths, or ambiguous ownership, and consumes the
+  manifest only after verification succeeds. Repeated successful cleanup is a no-op.
+- Cleanup requires lock-off, a clean affected tree, valid feature snapshots, and a fresh
+  overlay-free run with complete results, no failures, a passing locked-test comparison,
+  and a passing configured quality command before mutation. Snapshot existence alone is
+  insufficient. After deletion, verify the exact remaining identity set and real suite;
+  restore exact bytes on any error. Scaffold-only cleanup requires unchanged test identities.
+- Go quality checks validate supported source structures and removal-marker forms and run
+  the configured project quality command. RSpec-specific matcher bans remain RSpec-only;
+  report them as inapplicable to Go. Ordinary assertions, fakes, fixtures, and local HTTP
+  stubs are allowed. The quality report names the checks actually performed.
 
-It also demonstrated build failure without individual results, package success without
-any tests running, hidden subtests after failed setup, package abort after panic, and
-an accidentally green test against a zero-value placeholder.
+## Validation coverage
 
-The experiment used known expected case names. Automatic discovery, general scaffold
-validation, digesting, and table-row deletion were not implemented or validated.
-It did not validate Testify, databases/containers, race detection, build tags, cgo,
-multi-module projects, generic APIs, changed signatures, or crash recovery. Do not
-turn those omissions into silent promises or silent support restrictions; exercise
-needed cases during implementation and surface consequential limitations.
+The executed Go toolchain is Go 1.27.0 on darwin/arm64. The helper module's Go 1.23
+declaration specifies source syntax; it is not a tested minimum-version claim.
+Repository regression fixtures exercise discovered identities and structural digests,
+missing declarations through temporary overlays, named assertion failures, unchanged
+tests passing against real implementations, additive methods and fields, build-tag and
+package selection, and cleanup with exact restoration after verification failure.
 
-Temporary evidence, which may disappear and is not a runtime dependency:
-`/private/tmp/kaba-go-spike-bye2c7up/REPORT.txt`, `results.json`, `experiment.py`,
-`extend_field.go`, and the per-case event streams under `results/`.
-The durable regression cases belong in Kaba's test suite during implementation.
+Negative cases cover package success without test execution, hidden children after
+failed setup, package aborts, build failures, and accidentally passing zero placeholders.
+Go-only fixtures use the standard library. External Testify integration, databases,
+containers, cgo execution, and multi-module workflows are not validated compatibility
+claims. Race checks belong in the configured quality command; race-mode snapshots are
+unsupported. Existing generic struct field additions and conflicting scaffold field
+import aliases fail explicitly. Trapped TERM cleanup is tested; SIGKILL and host crashes
+can leave unused temporary directories, which subsequent runs never reuse.

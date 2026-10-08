@@ -9,7 +9,7 @@
     {
       "name": "kaba",
       "source": "./",
-      "description": "A mechanically-enforced spec-driven TDD workflow. Tests are written and locked before implementation code, and git-based gates — not prompts — enforce the boundary. Currently targets Rails/RSpec.",
+      "description": "A mechanically-enforced spec-driven TDD workflow. Tests are written and locked before implementation code, and git-based gates — not prompts — enforce the boundary. Supports Rails/RSpec and Go.",
       "version": "0.3.0"
     }
   ]

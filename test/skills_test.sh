@@ -178,3 +178,22 @@ assert_ok "template table has Expected landing"  grep -q 'Expected landing' "$SC
 assert_ok "implement-tests documents the criterion marker" grep -q '# CRITERION-ID' "$SK/implement-tests/SKILL.md"
 assert_ok "implement-tests mentions the plan lock"         grep -q 'test-plan.lock.json' "$SK/implement-tests/SKILL.md"
 assert_ok "fix-tests invokes allowlist-append" grep -q 'allowlist-append' "$SK/fix-tests/SKILL.md"
+
+# Runner contracts are shared reference, reached before runner-specific work.
+for name in acceptance-criteria plan-tests implement-tests review-tests fix-tests plan-code implement-code; do
+  assert_ok "$name reaches shared runner contracts" grep -q 'kaba.scriptdir)/../docs/test-runners.md' "$SK/$name/SKILL.md"
+done
+assert_ok 'implementation end gate uses classifier dirty check' grep -q 'session-lock.sh check-dirty implement' "$SK/implement-code/SKILL.md"
+assert_fail 'implementation end gate avoids directory-only Git check' 1 grep -q 'git status --porcelain --' "$SK/implement-code/SKILL.md"
+assert_ok 'implementation command failure blocks completion' grep -q 'failing command blocks completion' "$SK/implement-code/SKILL.md"
+assert_ok 'Go reference uses criterion markers' grep -q '// CRITERION-ID' "$SCRIPT_DIR/../docs/test-runners.md"
+assert_ok 'Go reference rejects every overlay-assisted PIN' grep -q 'rejects every PIN' "$SCRIPT_DIR/../docs/test-runners.md"
+assert_ok 'init confirms independent permissions' grep -q 'all four lists' "$SK/init/SKILL.md"
+
+# Bootstrap references resolve from the installed skill before consumer Git config exists.
+init_reference_resolves() {
+  local target
+  target="$(sed -n 's/.*](\([^)]*docs\/test-runners.md\)).*/\1/p' "$SK/init/SKILL.md" | head -1)"
+  [[ -n "$target" && -r "$SK/init/$target" ]]
+}
+assert_ok 'fresh init can resolve its runner reference without kaba.scriptdir' init_reference_resolves

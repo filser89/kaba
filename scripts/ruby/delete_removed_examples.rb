@@ -13,25 +13,39 @@
 # Prints one "<count>\t<path>" line per file. --count-only reports without editing.
 
 require "prism"
+require "json"
 
 MARKER_PREFIX = "REMOVED by "
 EXAMPLE_METHODS = %i[it specify example scenario].freeze
 
 count_only = !ARGV.delete("--count-only").nil?
+feature = nil
+pending_json = nil
+if (index = ARGV.index("--feature"))
+  feature = ARGV[index + 1]
+  abort "missing --feature value" unless feature && feature.match?(/\A[A-Za-z0-9][A-Za-z0-9._-]*\z/)
+  ARGV.slice!(index, 2)
+end
+if (index = ARGV.index("--pending-json"))
+  pending_json = ARGV[index + 1]
+  abort "missing --pending-json value" unless pending_json
+  ARGV.slice!(index, 2)
+end
+pending = pending_json ? JSON.parse(File.read(pending_json)).fetch("examples") : nil
 abort "usage: delete_removed_examples.rb [--count-only] FILE..." if ARGV.empty?
 
-def marked_example_nodes(node, acc = [])
+def marked_example_nodes(node, feature, acc = [])
   if node.is_a?(Prism::CallNode) && EXAMPLE_METHODS.include?(node.name)
     args = node.arguments&.arguments || []
     keywords = args.find { |a| a.is_a?(Prism::KeywordHashNode) }
     marked = keywords&.elements&.any? do |el|
       el.is_a?(Prism::AssocNode) &&
         el.key.is_a?(Prism::SymbolNode) && el.key.unescaped == "skip" &&
-        el.value.is_a?(Prism::StringNode) && el.value.unescaped.start_with?(MARKER_PREFIX)
+        el.value.is_a?(Prism::StringNode) && (feature ? el.value.unescaped == "#{MARKER_PREFIX}#{feature}" : el.value.unescaped.start_with?(MARKER_PREFIX))
     end
     acc << node if marked
   end
-  node.compact_child_nodes.each { |child| marked_example_nodes(child, acc) }
+  node.compact_child_nodes.each { |child| marked_example_nodes(child, feature, acc) }
   acc
 end
 
@@ -40,7 +54,16 @@ ARGV.each do |path|
   result = Prism.parse_file(path)
   abort "ERROR: parse failure in #{path}" unless result.success?
 
-  nodes = marked_example_nodes(result.value)
+  nodes = marked_example_nodes(result.value, feature)
+  if pending
+    nodes.each do |node|
+      example = pending.find do |item|
+        File.expand_path(item.fetch("file_path")) == File.expand_path(path) &&
+          item.fetch("line_number") == node.location.start_line
+      end
+      abort "ERROR: marked example must report pending in #{path}:#{node.location.start_line}" unless example && example["status"] == "pending"
+    end
+  end
   total += nodes.length
   puts "#{nodes.length}\t#{path}"
   next if count_only || nodes.empty?

@@ -1,0 +1,25 @@
+#!/usr/bin/env bash
+set -uo pipefail
+SCRIPT_DIR="$(CDPATH="" cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+. "$SCRIPT_DIR/assert.sh"
+export GOCACHE="${GOCACHE:-${TMPDIR:-/tmp}/kaba-go-build}"
+go_digest_fixture="$(mktemp -d)"
+printf 'module example/digests\n\ngo 1.23\n' > "$go_digest_fixture/go.mod"
+go_digest() { (cd "$SCRIPT_DIR/../scripts/go" && go run . digests --root "$go_digest_fixture") | jq -r '.[0].digest'; }
+printf 'package demo\nimport "testing"\nfunc TestOne(t *testing.T){t.Error("red")}\n' > "$go_digest_fixture/one_test.go"
+go_before="$(go_digest)"
+assert_stdout_match "public digest emits a structural hash" '^[a-f0-9]{64}$' go_digest
+printf 'package demo\nimport "testing"\n// harmless\nfunc TestOne(t *testing.T) { t.Error( "red" ) }\n' > "$go_digest_fixture/one_test.go"
+assert_eq "public digest ignores formatting" "$go_before" "$(go_digest)"
+printf 'package demo\nimport "testing"\nfunc TestOne(t *testing.T){t.Error("changed")}\n' > "$go_digest_fixture/one_test.go"
+assert_ok "public digest sees assertion change" test "$go_before" != "$(go_digest)"
+printf 'package demo\nimport "testing"\nfunc TestOne(t *testing.T){helper(t)}\n' > "$go_digest_fixture/one_test.go"
+printf 'package demo\nimport "testing"\nfunc helper(t *testing.T){if Value()==0 {t.Error("red")}}\n' > "$go_digest_fixture/helper_test.go"
+printf 'package demo\nfunc Value() int{return 0}\n' > "$go_digest_fixture/value.go"
+go_before="$(go_digest)"
+printf 'package demo\nimport "testing"\nfunc helper(t *testing.T){if Value()==0 {t.Error("changed")}}\n' > "$go_digest_fixture/helper_test.go"
+assert_ok "public digest includes referenced helpers across files" test "$go_before" != "$(go_digest)"
+go_before="$(go_digest)"
+printf 'package demo\nfunc Value() int{return 1}\n' > "$go_digest_fixture/value.go"
+assert_eq "production implementation preserves test digest" "$go_before" "$(go_digest)"
+rm -rf "$go_digest_fixture"

@@ -5,6 +5,13 @@
 > user or repository authorization. Follow repository Git authorization rules instead
 > of any skill instruction to commit automatically.
 
+**Status:** Implemented and verified; correctness review has no remaining actionable findings.
+The complete verification command is `bash test/run.sh`: 1,056 assertions pass with zero
+failures, including the real Go workflow and Ruby/Prism compatibility checks.
+Execution uses Go 1.27.0 on darwin/arm64,
+Ruby 4.0.5, and Prism 1.9.0.
+Supported forms and explicit limits are in [the runner contract](test-runners.md).
+
 **Goal:** Add reusable Go support to Kaba with the existing workflow and enforcement
 guarantees while preserving Rails/RSpec behavior.
 
@@ -42,6 +49,16 @@ skill metadata, and hooks needed by the adaptation.
 
 ## Review focus
 
+The design's **Execution contracts** are binding acceptance criteria for the corresponding
+tasks. Execute independent foundations concurrently with exclusive file ownership: task 1,
+task 4, and the RSpec-only extraction portion of task 3. Task 2 follows task 1; finish Go
+result integration after task 4 establishes inventory. Task 5 follows the Go inventory and
+runner contracts. Task 6 can implement protection and cleanup against the fixed runner,
+classifier, and scaffold-manifest contracts while task 5 runs; its integration acceptance
+requires tasks 2–5 to pass review. Task 7 and the final integration review close
+the work. Each completed task receives a spec and code-quality review before acceptance.
+Implementation changes remain uncommitted until separately authorized.
+
 1. Colocated production/test files, future files, symlink targets, and moves across
    ownership boundaries must classify consistently in hooks and gates (tasks 1–2).
 2. Successful package exit or failed parent setup must not conceal unexecuted cases;
@@ -55,19 +72,18 @@ skill metadata, and hooks needed by the adaptation.
 
 ## File structure and interfaces
 
-Keep changes near the existing components. New paths below are planned files, not files
-already implemented. Internal Go files may be split by responsibility without changing
-the public shell contracts.
+The components below implement the public shell contracts. Internal Go files separate
+source discovery, support digests, scaffolding, quality checks, and cleanup.
 
 | Path | Responsibility |
 |---|---|
 | `scripts/config.sh` | Load legacy and explicit-runner configuration; validate permission lists |
-| `scripts/path-permissions.sh` (new) | Normalize/classify paths; expose the shared permission policy |
+| `scripts/path-permissions.sh` | Normalize/classify paths; expose the shared permission policy |
 | `scripts/session-lock.sh`, `scripts/session-lock-guard.sh`, `scripts/hooks/pre-commit` | Consume the classifier at existing enforcement boundaries |
-| `scripts/test-runner.sh` (new) | Select adapter and expose discovery/run/digest/cleanup operations |
-| `scripts/adapters/rspec.sh` (new) | Existing RSpec invocation and Ruby helper integration |
-| `scripts/adapters/go.sh` (new) | Go invocation, temporary-build lifetime, and helper integration |
-| `scripts/go/` (new) | Focused Go parsing, inventory, result, digest, scaffold, and cleanup helpers plus unit tests |
+| `scripts/test-runner.sh` | Select adapter and expose discovery/run/digest operations |
+| `scripts/adapters/rspec.sh` | RSpec invocation and Ruby helper integration |
+| `scripts/adapters/go.sh` | Go invocation, temporary-build lifetime, and helper integration |
+| `scripts/go/` | Focused Go parsing, inventory, result, digest, scaffold, and cleanup helpers plus unit tests |
 | `scripts/snapshot-tests.sh` | Preserve workflow comparisons; consume adapter data and protected file inventory |
 | `scripts/cleanup-tests.sh` | Coordinate source-aware deletions, scaffold cleanup, verification, and rollback |
 | `scripts/banned-patterns.sh` | Select applicable test-quality checks for the configured runner |
@@ -85,7 +101,7 @@ session-lock.sh check <path>...
   retain the current public allow/deny contract and diagnostics
 
 test-runner.sh identities
-test-runner.sh run
+test-runner.sh run --phase baseline|post-test|post-impl|cleanup
 test-runner.sh digests
   structured output; runner-specific diagnostics on stderr
 
@@ -132,13 +148,13 @@ isolated test setup; they never authorize committing the Kaba task branch.
 **Consumes:** legacy settings and the four explicit permission lists.
 **Produces:** the classifier contract above and validated configuration for later tasks.
 
-- [ ] Add failing loader tests for the Go example, quoted block/inline lists, empty
+- [x] Add failing loader tests for the Go example, quoted block/inline lists, empty
   exclusions, missing runner or allow lists, malformed patterns, and ambiguous mixtures
   of legacy and new permission settings. Preserve existing legacy error behavior.
-- [ ] Add classifier fixtures for root/nested `*_test.go`, testdata, shared helpers,
+- [x] Add classifier fixtures for root/nested `*_test.go`, testdata, shared helpers,
   production files, shared dependencies, workflow artifacts, and paths allowed by neither.
   Include paths that do not exist yet and literal special characters in legacy carve-outs.
-- [ ] Pin inclusion/exclusion precedence and effective shared ownership, for example:
+- [x] Pin inclusion/exclusion precedence and effective shared ownership, for example:
 
   ```bash
   classify() { (cd "$repo" && "$PERMISSIONS" classify "$1"); }
@@ -150,11 +166,11 @@ isolated test setup; they never authorize committing the Kaba task branch.
 
   Define `PERMISSIONS` as the absolute new script path and construct `repo` using the
   existing `mktemp`/`git init` fixture style. Assertions are examples to add to that fixture.
-- [ ] Run the focused tests and confirm the missing behavior causes failures.
-- [ ] Implement parsing, legacy translation, normalization, and classification once.
+- [x] Run the focused tests and confirm the missing behavior causes failures.
+- [x] Implement parsing, legacy translation, normalization, and classification once.
   The matcher uses only documented shared dependencies; expose a required dependency
   change before adopting one. Keep includes/excludes independent of `.gitignore`.
-- [ ] Run both new test files and `test/config_test.sh`; all assertions pass.
+- [x] Run both new test files and `test/config_test.sh`; all assertions pass.
 
 ## Task 2 — Use classification at every ownership boundary
 
@@ -165,14 +181,14 @@ isolated test setup; they never authorize committing the Kaba task branch.
 **Consumes:** task 1 classifier. **Produces:** consistent edit/commit/change-set checks
 for later snapshot and end-gate integration.
 
-- [ ] Add failing tests for both session modes against the same colocated files.
+- [x] Add failing tests for both session modes against the same colocated files.
   Retain off-mode behavior and both hosts' existing hook formats.
-- [ ] Exercise add, update, delete, and move tool payloads, plus actual staged additions,
+- [x] Exercise add, update, delete, and move tool payloads, plus actual staged additions,
   deletions, and renames in disposable Git repositories. Check both sides of each move.
-- [ ] Add path tests for spaces, repeated `./`, duplicate separators, physical/symlink
+- [x] Add path tests for spaces, repeated `./`, duplicate separators, physical/symlink
   aliases, symlink targets, nonexistent leaves, outside paths, and traversal. Preserve
   paths losslessly through Git change-set plumbing or reject unsupported forms explicitly.
-- [ ] Pin the critical negative behavior at the public entry point:
+- [x] Pin the critical negative behavior at the public entry point:
 
   ```bash
   lock set implement
@@ -183,9 +199,9 @@ for later snapshot and end-gate integration.
   ```
 
   Extend the existing test's `lock` fixture rather than inventing another assertion harness.
-- [ ] Confirm failures, replace duplicated ownership logic with the common classifier,
+- [x] Confirm failures, replace duplicated ownership logic with the common classifier,
   and run the focused tests plus existing session-start rewiring tests.
-- [ ] Verify dirty-state inventory includes staged, unstaged, and untracked files for
+- [x] Verify dirty-state inventory includes staged, unstaged, and untracked files for
   snapshot resume and end-gate consumers, including old paths of deleted files.
 
 ## Task 3 — Adapter boundary and Go execution results
@@ -198,11 +214,11 @@ modify `scripts/snapshot-tests.sh` and affected snapshot tests.
 **Consumes:** validated runner/command settings. **Produces:** runner-neutral results
 and explicit invalid-run errors; existing RSpec outputs retain their interpretation.
 
-- [ ] Add regression tests before extracting RSpec invocation. Cover normal results,
+- [x] Add regression tests before extracting RSpec invocation. Cover normal results,
   dry-run discovery, load errors, missing tools, and supported legacy snapshots/plans.
-- [ ] Add Go JSON fixtures for pass/fail/skip, package/build failure, interleaved parallel
+- [x] Add Go JSON fixtures for pass/fail/skip, package/build failure, interleaved parallel
   events, malformed/truncated output, unexplained package failure, and early successful exit.
-- [ ] Add real temporary Go packages that reproduce the experiment's incomplete runs:
+- [x] Add real temporary Go packages that reproduce the experiment's incomplete runs:
 
   ```go
   func TestMain(m *testing.M) { os.Exit(0) }
@@ -212,11 +228,11 @@ and explicit invalid-run errors; existing RSpec outputs retain their interpretat
   Import `os` and `testing` in that fixture. Assert capture fails because `TestNever`
   did not execute even though the process exited successfully. Add a separate fixture
   where `TestMain` exits nonzero and one where compilation fails before any test runs.
-- [ ] Run failing tests, extract the RSpec adapter with no semantic redesign, and add Go
+- [x] Run failing tests, extract the RSpec adapter with no semantic redesign, and add Go
   event conversion. Distinguish structural run errors from valid individual red results.
-- [ ] Verify uncached execution and consistent package/build selection; reject command
+- [x] Verify uncached execution and consistent package/build selection; reject command
   options that would silently narrow the inventory used by the workflow gates.
-- [ ] Run focused adapter tests and all existing snapshot capture/comparison tests.
+- [x] Run focused adapter tests and all existing snapshot capture/comparison tests.
 
 ## Task 4 — Go discovery and structural digests
 
@@ -227,10 +243,10 @@ add source fixtures under `test/fixtures/go/`.
 **Consumes:** source tree and runner selection context. **Produces:** expected identities,
 group relationships, source locations, supported cleanup locations, and case digests.
 
-- [ ] Add failing fixtures for same-package/external tests, literal named subtests,
+- [x] Add failing fixtures for same-package/external tests, literal named subtests,
   supported named tables, nested cases, duplicates, name normalization collisions,
   unsupported dynamic case generation, and parent setup failing before child registration.
-- [ ] Use the agreed table form as a fixture, including independently named outcomes:
+- [x] Use the agreed table form as a fixture, including independently named outcomes:
 
   ```go
   for _, tc := range []struct {
@@ -243,14 +259,14 @@ group relationships, source locations, supported cleanup locations, and case dig
   }
   ```
 
-- [ ] Confirm discovery failures before implementing AST-based source enumeration.
+- [x] Confirm discovery failures before implementing AST-based source enumeration.
   Document the accepted table forms and reject forms whose cases cannot be enumerated.
-- [ ] Add paired digest fixtures: formatting/comments only; changed assertion; changed
+- [x] Add paired digest fixtures: formatting/comments only; changed assertion; changed
   single-row data; added/reordered row; changed shared setup/body; compiler directives.
   Assert unaffected sibling identities and digests stay equal while affected cases change.
-- [ ] Implement source-aware digest composition and match runtime names to the expected
+- [x] Implement source-aware digest composition and match runtime names to the expected
   inventory. Preserve the source-to-case mapping required for precise cleanup.
-- [ ] Run Go helper unit tests through the shell wrapper and both public helper test files.
+- [x] Run Go helper unit tests through the shell wrapper and both public helper test files.
 
 ## Task 5 — Validated temporary compilation scaffolding
 
@@ -261,22 +277,25 @@ group relationships, source locations, supported cleanup locations, and case dig
 **Produces:** a validated temporary overlay with deterministic lifetime and unchanged
 production files. Existing implementation bodies are preserved.
 
-- [ ] Turn experiment cases into failing script-level tests: missing new type/function,
+- [x] Turn experiment cases into failing script-level tests: missing new type/function,
   new method on existing type, field addition, duplicate declaration, arbitrary production
   replacement, zero-value accidental pass, panic/incomplete run, and stale-overlay collision.
-- [ ] Hash production files before/after capture and test-owned files before/after the
+- [x] Hash production files before/after capture and test-owned files before/after the
   simulated implementation. Assert equality where ownership requires immutability.
-- [ ] Enumerate and test accepted declaration/minimal-body AST forms before implementing
+- [x] Enumerate and test accepted declaration/minimal-body AST forms before implementing
   the validator. Reject bodies introducing business behavior or modifying existing bodies.
   Generate existing-type field additions in scripts rather than trusting whole-file replacements.
-- [ ] Implement temporary-build creation/cleanup and verify cleanup after successful and
+- [x] Implement temporary-build creation/cleanup and verify cleanup after successful and
   failed invocations. Exercise supported interruption/error paths and report any recovery gap.
-- [ ] Verify missing declarations produce real red results, not synthesized failures.
+- [x] Verify missing declarations produce real red results, not synthesized failures.
   A placeholder-induced pass remains subject to the existing PIN requirements; scaffolding
   alone must not establish that real behavior already conforms.
-- [ ] Create the real implementation in the disposable fixture, run the same locked tests
+- [x] Reject an otherwise valid PIN whose passing result depends on an overlay. Prove PINs
+  against real code without scaffolding and fail explicitly when that package cannot compile.
+  Verify post-implementation runs disable scaffolding even while scaffold sources remain.
+- [x] Create the real implementation in the disposable fixture, run the same locked tests
   without an overlay, and require green. Assert scaffold/test sources were unchanged.
-- [ ] Run focused scaffold, result, and discovery tests together.
+- [x] Run focused scaffold, result, and discovery tests together.
 
 ## Task 6 — Snapshot protection and exact cleanup
 
@@ -287,19 +306,24 @@ add Go cleanup support under `scripts/go/`, `test/go_snapshot_test.sh`,
 **Consumes:** classifier, complete adapter results, structural digests, and source mappings.
 **Produces:** protected-file snapshot comparisons and scripted deletion/verification/rollback.
 
-- [ ] Add failing tests for test-owned helper, fixture, scaffold, and test-source changes,
+- [x] Add failing tests for test-owned helper, fixture, scaffold, and test-source changes,
   including additions/deletions/renames with unchanged individual test outcomes.
-- [ ] Test resume detection using classified files instead of a single directory. Preserve
+- [x] Test resume detection using classified files instead of a single directory. Preserve
   normal planned test-session modifications and all existing MODIFY/REMOVE/PIN/TOUCH rules.
-- [ ] Test format/runner/context mismatches and exact group boundaries. Preserve the
+- [x] Test format/runner/context mismatches and exact group boundaries. Preserve the
   old RSpec reader; never reinterpret RSpec addresses as Go names.
-- [ ] Add exact-removal fixtures: a standalone skipped function; one skipped row with two
+- [x] Add exact-removal fixtures: a standalone skipped function; one skipped row with two
   unremoved neighbors; an ambiguous/dynamic source form that must be refused. Verify that
   the expected named case reports skipped before cleanup and only that source unit is deleted.
-- [ ] Exercise lock-on, incomplete feature, dirty tree, incorrect remaining test count,
+- [x] Exercise lock-on, incomplete feature, dirty tree, incorrect remaining test count,
   failed real-suite verification, and successful cleanup. Test scaffolds using a feature's
   generated inventory; ownership itself continues to use patterns, not that inventory.
-- [ ] Assert restoration byte-for-byte on failure, for example:
+- [x] Record feature-linked scaffold paths/hashes/packages during validated post-test capture.
+  Test unsafe or changed manifests, scaffold-only cleanup, exact remaining identity equality,
+  successful manifest consumption, repeated cleanup, and restoration after partial deletion.
+- [x] Prove cleanup eligibility with current real-code execution, comparison, and quality
+  checks; reject a present post-implementation snapshot whose gates do not pass.
+- [x] Assert restoration byte-for-byte on failure, for example:
 
   ```bash
   before="$(git hash-object "$scaffold")"
@@ -309,10 +333,10 @@ add Go cleanup support under `scripts/go/`, `test/go_snapshot_test.sh`,
 
   Define `scaffold` and `cleanup` in the disposable fixture; include unrelated files and
   assert they are unchanged after both success and failure.
-- [ ] Implement inventory capture/comparison, exact AST deletion, and coordinated cleanup.
+- [x] Implement inventory capture/comparison, exact AST deletion, and coordinated cleanup.
   The script checks completion and lock state, selects recorded scaffold files, verifies
   without overlays, and restores on failure. No LLM-selected deletion or manual rollback.
-- [ ] Run new Go tests, legacy cleanup tests, and all existing snapshot/Prism tests.
+- [x] Run new Go tests, legacy cleanup tests, and all existing snapshot/Prism tests.
 
 ## Task 7 — Initialization, skills, documentation, and full verification
 
@@ -323,28 +347,28 @@ add Go cleanup support under `scripts/go/`, `test/go_snapshot_test.sh`,
 Add `test/go_workflow_test.sh` and a Go quality-check test file. Update `CHANGELOG.md`
 only with the implemented user-visible capability and migration/dependency requirements.
 
-- [ ] Add failing initialization tests for explicit Go settings, config round-trip,
+- [x] Add failing initialization tests for explicit Go settings, config round-trip,
   shared file patterns, confirmation/overwrite behavior, and unchanged legacy Rails setup.
-- [ ] Add quality-gate tests proving Go files are actually inspected and a failing
+- [x] Add quality-gate tests proving Go files are actually inspected and a failing
   project verification command blocks completion. Preserve applicable documented test
   quality requirements without inventing bans on valid Testify assertions, fakes, local
   HTTP stubs, or fixtures. Unsupported rule translation must be surfaced, not silently skipped.
-- [ ] Implement initialization/quality dispatch and update every affected skill reference
+- [x] Implement initialization/quality dispatch and update every affected skill reference
   to test-directory-only ownership, RSpec identity syntax, Ruby-only parsing, lazy unresolved
   symbols, criterion comments, and cleanup. Preserve their existing stage responsibilities.
-- [ ] Extend manifest/skill tests to verify packaged Go helpers and consistent instructions.
+- [x] Extend manifest/skill tests to verify packaged Go helpers and consistent instructions.
   Documentation must describe actual tested behavior and supported source forms.
-- [ ] Run a real Go fixture through initialization, baseline, planned test work, overlay
+- [x] Run a real Go fixture through initialization, baseline, planned test work, overlay
   post-test capture/compare, locked implementation, real post-implementation capture/compare,
   the configured quality command, and between-feature cleanup. Include a negative attempt
   to edit a test-owned file through each enforcement boundary.
-- [ ] Run equivalent legacy compatibility checks with Ruby/Prism available. Ensure Go helper
+- [x] Run equivalent legacy compatibility checks with Ruby/Prism available. Ensure Go helper
   tests run through `bash test/run.sh`, then run the complete suite under Bash 3.2.
-- [ ] Record exact Go/Ruby/Prism versions and test outcomes. Base supported-version claims
+- [x] Record exact Go/Ruby/Prism versions and test outcomes. Base supported-version claims
   on executed compatibility tests, not on the disposable experiment alone. Exercise
   assertion-library and project-command integration using self-contained fixtures that
   require no external service credentials. Report untested platform/build-context limits.
-- [ ] Run `git diff --check`, review the full task diff, and verify unrelated changes
+- [x] Run `git diff --check`, review the full task diff, and verify unrelated changes
   against their recorded pre-implementation state. Finish with actual results and material limitations.
 
 ## Completion and authorization boundary

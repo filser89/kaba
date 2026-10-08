@@ -14,6 +14,15 @@
 - Contract deltas: [N]
 - Invalidation sweep: [N] examples hit — [N] keep / [N] modify / [N] remove
 
+<!-- Runner contract: read $(git config kaba.scriptdir)/../docs/test-runners.md.
+RSpec uses positional identities and describe/context/it. Go uses import path plus
+runtime name, named functions/literal subtests/literal anonymous struct table rows.
+Copy existing identities from snapshot-tests.sh identities. Explicit ownership has
+no test_dir. For Go include planned test-owned scaffold sources under the package's
+testdata/kaba/<feature>/*.go only when declarations are missing. PIN requires an
+entirely overlay-free capture. Criterion markers: # CRITERION-ID (RSpec),
+// CRITERION-ID (Go). Removal uses framework-specific leaf markers. -->
+
 ## Test Files
 
 <!--
@@ -83,7 +92,7 @@
 |--------|--------------------|-------------|------------------|--------|
 | [MODIFY/REMOVE/PIN/TOUCH] | [address, or — for PIN] | [description] | [failed/pending/passed/unchanged] | [reason] |
 
-## Factories
+## Factories / Fixtures
 
 <!--
   ACTION REQUIRED: Add one entry per entity referenced in the acceptance criteria.
@@ -130,7 +139,7 @@
   Every criterion MUST appear exactly once. No omissions, no duplicates.
 -->
 
-| Criterion ID | Test File | Describe Block |
+| Criterion ID | Test File | Describe Block / Go Test Name |
 |---|---|---|
 | [ID] | [file path] | [test group path, e.g., Order > validations > total] |
 

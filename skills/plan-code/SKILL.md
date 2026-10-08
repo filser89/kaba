@@ -4,6 +4,11 @@ disable-model-invocation: true
 description: Turn the locked test suite into an implementation plan — components, schema, decisions, and dependency-ordered build order to make every test green, consistent with existing architecture. No implementation code.
 ---
 
+At the load-context step, read `$(git config kaba.scriptdir)/../docs/test-runners.md` for the configured runner's
+ownership, identity, source, criterion-marker, scaffolding, and cleanup contracts.
+Apply that runner's branch to the steps below. RSpec describe blocks/factories map to
+Go named functions/subtests/table rows and fixtures/helpers when `test_runner: go`.
+
 ## User Input
 
 ```text
@@ -27,7 +32,7 @@ This is a **planning step**, not a writing step. No implementation code is produ
      - `PRIOR_RUN=yes` — STOP and ask the user, naming what `EXISTING` lists (and mentioning `EMPTY` if non-empty, which means the previous run crashed part-way): "`code-plan.md` already exists for this feature — a prior run of `/kaba:plan-code` completed. Overwrite? The previous version is not recoverable (feature artifacts are untracked at this stage), and a re-run is a fresh derivation, not a reproduction." Ask, then **end your turn** — do not answer yourself and do not proceed in the same response. Use `AskUserQuestion` if it is available. Continue only on an explicit yes.
      - `PRIOR_RUN=no` — proceed.
      - `PRIOR_RUN=unknown`, a non-zero exit, or no `PRIOR_RUN=` line at all — STOP and report the script's stderr verbatim. **Absence of an answer is never "no."**
-   - Only then identify the test directory (`test_dir` in `.kaba/config.yml` — read it from there, never infer it from project structure) and read the **locked test suite** — the contract. If no tests exist, ERROR and stop: this command runs after the test session.
+   - Only then identify test-owned files (from the configured classifier and runner inventory) and read the **locked test suite** — the contract. If no tests exist, ERROR and stop: this command runs after the test session.
    - Read the spec from `FEATURE_SPEC` — the intent. If it does not exist, ERROR and stop.
 
 2. **Load context and template**:

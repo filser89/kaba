@@ -79,3 +79,86 @@ assert_stderr_match "dies outside a git repo" 'git' \
 
 rm -rf "$repo" "$noslash" "$bare" "$nokey" "$overlap1" "$overlap2" \
        "$commented" "$dotslash" "$absdir" "$dotdot"
+
+# Explicit runners and quoted permissions require no legacy test directory.
+go_config="$(cat "$SCRIPT_DIR/fixtures/go-config.yml")"
+repo="$(printf '%s\n' "$go_config" | make_repo)"
+assert_stdout_match "explicit runner is go" '^go$' in_repo 'kaba_load_config; printf "%s" "$KABA_TEST_RUNNER"'
+assert_stdout_match "quoted permission has no YAML quotes" '^\*\*/\*_test.go$' in_repo 'kaba_load_config; printf "%s\n" "$KABA_TEST_WRITE_ALLOW"'
+assert_stdout_match "explicit empty exclusions load" '^empty$' in_repo 'kaba_load_config; [ -z "$KABA_TEST_WRITE_EXCLUDE" ] && printf empty'
+assert_stdout_match "inline permission quote stripped" '^\*\*$' in_repo 'kaba_load_config; printf "%s" "$KABA_IMPLEMENT_WRITE_ALLOW"'
+rm -rf "$repo"
+repo="$(printf '%s\n' "$go_config" | sed "s/implement_write_allow:.*/implement_write_allow: ['**', 'literal,comma'] # comment/" | make_repo)"
+assert_stdout_match "quoted inline comma remains literal" '^literal,comma$' in_repo 'kaba_load_config; printf "%s\n" "$KABA_IMPLEMENT_WRITE_ALLOW"'
+rm -rf "$repo"
+for key in test_runner test_write_allow implement_write_allow test_write_exclude implement_write_exclude; do
+  repo="$(printf '%s\n' "$go_config" | sed "/^$key:/,/^[^[:space:]]/{ /^$key:/d; /^[[:space:]]/d; }" | make_repo)"
+  assert_stderr_match "missing explicit $key rejected" "$key" in_repo 'kaba_load_config'
+  rm -rf "$repo"
+done
+for pattern in '!internal/**' 'internal/?' 'internal/[ab]' '../escape' '/outside' 'internal/**x'; do
+  repo="$(printf '%s\n' "$go_config" | sed "s|implement_write_allow:.*|implement_write_allow: ['$pattern']|" | make_repo)"
+  assert_stderr_match "invalid pattern $pattern rejected" 'pattern|repo-relative' in_repo 'kaba_load_config'
+  rm -rf "$repo"
+done
+repo="$(printf '%s\ntest_dir: spec/\n' "$go_config" | make_repo)"
+assert_stderr_match "mixed legacy directory rejected" 'mix|legacy' in_repo 'kaba_load_config'
+rm -rf "$repo"
+repo="$(printf '%s\ntest_writable: []\n' "$go_config" | make_repo)"
+assert_stderr_match "mixed legacy carve-outs rejected" 'mix|legacy' in_repo 'kaba_load_config'
+rm -rf "$repo"
+repo="$(printf '%s' "$VALID" | make_repo)"
+assert_stdout_match "legacy runner defaults to rspec" '^rspec$' in_repo 'kaba_load_config; printf "%s" "$KABA_TEST_RUNNER"'
+rm -rf "$repo"
+# Fail closed on malformed list syntax, unsupported escapes and unknown runners.
+for list in "[]" "['internal\\helpers/**']" "['a',]" "['unterminated]" "['**'] garbage" "'{a: b}'" "[foo: bar]"; do
+  repo="$(printf '%s\n' "$go_config" | sed '/^implement_write_allow:/d' | make_repo)"
+  printf 'implement_write_allow: %s\n' "$list" >> "$repo/.kaba/config.yml"
+  assert_fail "rejects invalid allow list $list" 1 in_repo 'kaba_load_config'
+  rm -rf "$repo"
+done
+repo="$(printf '%s\n' "$go_config" | sed 's/test_runner: go/test_runner: unknown/' | make_repo)"
+assert_stderr_match "unsupported runner diagnostic" 'unsupported test_runner' in_repo 'kaba_load_config'
+rm -rf "$repo"
+repo="$(printf '%s\n' "$go_config" | sed "s|implement_write_allow:.*|implement_write_allow: ['././internal//pay/']|" | make_repo)"
+assert_stdout_match "normalizes explicit pattern separators" '^internal/pay/$' in_repo 'kaba_load_config; printf "%s" "$KABA_IMPLEMENT_WRITE_ALLOW"'
+rm -rf "$repo"
+repo="$(printf '%s\n' "$go_config" | sed "s|implement_write_allow:.*|implement_write_allow: ['file # label', 'it''s.go'] # comment|" | make_repo)"
+assert_stdout_match "quoted hash preserved in pattern" '^file # label$' in_repo 'kaba_load_config; printf "%s\n" "$KABA_IMPLEMENT_WRITE_ALLOW"'
+assert_stdout_match "single quote YAML escape decoded" "^it's.go$" in_repo 'kaba_load_config; printf "%s\n" "$KABA_IMPLEMENT_WRITE_ALLOW"'
+rm -rf "$repo"
+
+# Indentless YAML sequences must preserve exclusions rather than granting access.
+repo="$(printf '%s\n' "$go_config" | sed '/^rules_files:/d; /^implement_write_exclude:/,$d' | make_repo)"
+cat >> "$repo/.kaba/config.yml" <<'CFG'
+implement_write_exclude:
+- 'internal/*_test.go'
+- 'internal/testutil/**'
+rules_files: [AGENTS.md]
+CFG
+assert_stdout_match "indentless exclusions retain first entry" '^internal/\*_test.go$' in_repo 'kaba_load_config; printf "%s\n" "$KABA_IMPLEMENT_WRITE_EXCLUDE"'
+assert_stdout_match "indentless sequence ends at next key" '^AGENTS.md$' in_repo 'kaba_load_config; printf "%s\n" "$KABA_RULES_FILES"'
+assert_stdout_match "indentless exclusion protects test ownership" '^test$' in_repo '. "'"$SCRIPT_DIR"'/../scripts/path-permissions.sh"; kaba_load_config; kaba_classify_path internal/pay_test.go'
+rm -rf "$repo"
+
+# Anchors, aliases and tags are outside the flat YAML subset, including exclusions.
+for entry in '&tests internal/*_test.go' '*tests' '!tag internal/*_test.go'; do
+  for style in block inline; do
+    repo="$(printf '%s\n' "$go_config" | sed '/^implement_write_exclude:/,$d' | make_repo)"
+    if [ "$style" = block ]; then
+      printf 'implement_write_exclude:\n  - %s\n' "$entry" >> "$repo/.kaba/config.yml"
+    else
+      printf 'implement_write_exclude: [%s]\n' "$entry" >> "$repo/.kaba/config.yml"
+    fi
+    assert_fail "rejects $style YAML directive $entry" 1 in_repo 'kaba_load_config'
+    assert_stderr_match "diagnoses $style unsupported YAML directive" 'unsupported YAML' in_repo 'kaba_load_config'
+    rm -rf "$repo"
+  done
+done
+repo="$(printf '%s\n' "$go_config" | sed '/^implement_write_exclude:/,$d' | make_repo)"
+cat >> "$repo/.kaba/config.yml" <<'CFG'
+implement_write_exclude: ['&literal', '*literal']
+CFG
+assert_stdout_match "quoted anchor-like pattern remains literal" '^&literal$' in_repo 'kaba_load_config; printf "%s\n" "$KABA_IMPLEMENT_WRITE_EXCLUDE"'
+assert_stdout_match "quoted alias-like pattern remains a glob" '^\*literal$' in_repo 'kaba_load_config; printf "%s\n" "$KABA_IMPLEMENT_WRITE_EXCLUDE"'
+rm -rf "$repo"

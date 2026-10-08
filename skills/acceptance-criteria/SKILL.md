@@ -4,6 +4,11 @@ disable-model-invocation: true
 description: Decompose a feature specification's acceptance scenarios into granular, test-oriented acceptance criteria for the test session.
 ---
 
+At the load-context step, read `$(git config kaba.scriptdir)/../docs/test-runners.md` for the configured runner's
+ownership, identity, source, criterion-marker, scaffolding, and cleanup contracts.
+Apply that runner's branch to the steps below. RSpec describe blocks/factories map to
+Go named functions/subtests/table rows and fixtures/helpers when `test_runner: go`.
+
 ## User Input
 
 ```text
@@ -32,7 +37,7 @@ This is a **thinking step**, not a writing step. No test code is produced. No im
    - Read `CLAUDE.md` for project conventions (test framework, auth format, model names, etc.).
 
 3. **Identify the test directory**:
-   - The test directory is `test_dir` in `.kaba/config.yml` — read it from there; never infer it from project structure.
+   - Identify test-owned paths from `.kaba/config.yml` and the classifier; explicit configurations have no `test_dir`.
    - Once identified, scan it to understand what tests already exist. List the files — do NOT read every file in full, just note file paths and, for files that might overlap with this feature, read their high-level test organization (describe blocks, test names, etc.) to understand coverage.
 
 4. **Extract testable surface from the spec**:

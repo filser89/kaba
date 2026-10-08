@@ -73,4 +73,26 @@ git -C "$plain" init -q -b master
 assert_ok "non-kaba repo fails open for Codex patch" \
   sh -c "cd '$plain' && printf '%s' '$(payload_for_patch $'*** Begin Patch\n*** Add File: app/x.rb\n+x\n*** End Patch')' | '$GUARD'"
 
+cp "$SCRIPT_DIR/fixtures/go-config.yml" "$repo/.kaba/config.yml"
+(cd "$repo" && "$LOCK" set implement >/dev/null)
+assert_fail "Claude blocks colocated test" 2 run_guard "$(payload_for_path Write internal/pay/pay_test.go)"
+assert_ok "Claude permits colocated production" run_guard "$(payload_for_path Edit internal/pay/pay.go)"
+assert_fail "Claude rejects trailing newline without stripping" 2 run_guard "$(payload_for_path Write $'internal/pay/pay.go\n')"
+for operation in Add Update Delete; do
+  assert_fail "Codex $operation blocks colocated test" 2 run_guard "$(payload_for_patch "*** Begin Patch
+*** $operation File: internal/pay/pay_test.go
+*** End Patch")"
+done
+assert_fail "Codex move checks old test endpoint" 2 run_guard "$(payload_for_patch $'*** Begin Patch\n*** Update File: internal/pay/pay_test.go\n*** Move to: internal/pay/pay.go\n*** End Patch')"
+assert_fail "Codex move checks new test endpoint" 2 run_guard "$(payload_for_patch $'*** Begin Patch\n*** Update File: internal/pay/pay.go\n*** Move to: internal/pay/pay_test.go\n*** End Patch')"
+(cd "$repo" && "$LOCK" set test >/dev/null)
+for operation in Add Update Delete; do
+  assert_fail "Codex $operation blocks production in test mode" 2 run_guard "$(payload_for_patch "*** Begin Patch
+*** $operation File: internal/pay/pay.go
+*** End Patch")"
+done
+assert_fail "Codex move checks old production endpoint" 2 run_guard "$(payload_for_patch $'*** Begin Patch\n*** Update File: internal/pay/pay.go\n*** Move to: internal/pay/pay_test.go\n*** End Patch')"
+assert_ok "Codex fixture add preserves path spaces" run_guard "$(payload_for_patch $'*** Begin Patch\n*** Add File: internal/pay/testdata/input data.json\n+{}\n*** End Patch')"
+(cd "$repo" && "$LOCK" clear >/dev/null)
+assert_ok "guard retains off mode" run_guard "$(payload_for_path Write internal/pay/pay.go)"
 rm -rf "$repo" "$plain"
