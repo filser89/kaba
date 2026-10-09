@@ -1,6 +1,6 @@
 # Test Plan: [FEATURE]
 
-**Feature**: `[###-feature-name]` | **Date**: [DATE] | **Spec**: [link to spec.md]
+**Feature**: `[###-feature-name]` | **Spec**: [link to spec.md]
 **Acceptance Criteria**: [link to acceptance-criteria.md]
 
 **Note**: This template is filled in by the `/kaba:plan-tests` command. See `templates/test-plan-template.md` in the kaba plugin for the format reference. All paths, extensions, and naming patterns must use the project's actual conventions.
@@ -10,7 +10,10 @@
 - Test files: [N] ([N] new, [N] modify, [N] existing)
 - Factories: [N] ([N] new, [N] existing)
 - Shared helpers: [N] ([N] new, [N] existing)
-- Criteria mapped: [N] / [N total from acceptance criteria]
+- Behavioral criteria mapped (unique IDs): [N] / [N total from acceptance criteria]
+- Required outcomes/variants mapped: [N] / [N]
+- Non-automated runtime evidence: [N] planned checks
+- Delivery Obligations: [N] separate completion tasks
 - Contract deltas: [N]
 - Invalidation sweep: [N] examples hit — [N] keep / [N] modify / [N] remove
 
@@ -27,7 +30,8 @@ entirely overlay-free capture. Criterion markers: # CRITERION-ID (RSpec),
 
 <!--
   ACTION REQUIRED: Add one entry per test file using the format below.
-  Assign every criterion from acceptance-criteria.md to exactly one file.
+  Map every automated criterion and its named required variants to one or more files.
+  Related outcomes can share a coherent test; one test can cover several criteria.
   List ALL criterion IDs explicitly — do NOT use ranges.
   Use the project's actual file paths, extensions, and naming conventions.
 -->
@@ -43,7 +47,8 @@ entirely overlay-free capture. Criterion markers: # CRITERION-ID (RSpec),
       - covers: [e.g., DOM-001, DOM-002]
 - **Dependencies**: [e.g., order factory, customer factory, authenticated request helper]
 
-<!-- Repeat for each test file. Every criterion ID in Criteria MUST appear in exactly one covers: line. -->
+<!-- Repeat for each test file. Every automated criterion ID MUST appear in at least one covers: line; identify the
+required outcomes/variants covered at each location. -->
 
 ## Invalidation Sweep
 
@@ -134,13 +139,25 @@ entirely overlay-free capture. Criterion markers: # CRITERION-ID (RSpec),
 ## Criteria Mapping
 
 <!--
-  ACTION REQUIRED: Fill this table with one row per criterion from acceptance-criteria.md.
-  This table is the CONTRACT — the implement-tests step MUST follow it exactly.
-  Every criterion MUST appear exactly once. No omissions, no duplicates.
+  ACTION REQUIRED: Map every behavioral criterion, related required outcome, and named variant.
+  Multiple evidence locations per criterion and several criteria per coherent test are valid.
+  Count unique criteria. Every required outcome/variant has explicit coverage; repeated IDs
+  identify the distinct portion established by each location. Source/configuration inspection,
+  command verification, and manual checks name concrete artifacts/procedures and expected results.
+  Delivery Obligations belong in their separate section, not fake test-file rows.
 -->
 
-| Criterion ID | Test File | Describe Block / Go Test Name |
-|---|---|---|
-| [ID] | [file path] | [test group path, e.g., Order > validations > total] |
+| Criterion ID | Required outcomes / named variants | Evidence kind | Location / procedure | Expected result |
+|---|---|---|---|---|
+| [ID] | [outcomes and variant names] | [automated test / source/configuration inspection / command verification / manual check] | [file + test name, artifact, or exact check procedure] | [what establishes the behavior] |
 
-<!-- Continue for ALL criteria. -->
+<!-- Continue for ALL behavioral criteria and required variants. -->
+
+## Delivery Obligations
+
+| Obligation ID | Source | Deliverable | Completion check |
+|---|---|---|---|
+| [DO-NNN] | [spec reference] | [documentation, configuration example, CI/setup verification, or completion task] | [concrete review/check] |
+
+<!-- Preserve every known delivery task. Do not assign these to fake test files. Runtime
+configuration behavior, security, deadlines, and user-visible setup belong in Criteria Mapping. -->

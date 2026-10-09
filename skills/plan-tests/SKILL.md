@@ -1,7 +1,7 @@
 ---
 name: plan-tests
 disable-model-invocation: true
-description: Translate acceptance criteria into a concrete test plan — file locations, factory needs, shared contexts, and criterion-to-file mapping. No test code.
+description: Translate acceptance criteria into a concrete test plan — file locations, factory needs, shared contexts, and behavior-to-evidence mapping. No test code.
 ---
 
 At the load-context step, read `$(git config kaba.scriptdir)/../docs/test-runners.md` for the configured runner's
@@ -19,7 +19,8 @@ You **MUST** consider the user input before proceeding (if not empty). The user 
 
 ## Purpose
 
-This command takes the acceptance criteria (what to test) and produces a test plan (how to organize the tests). It makes structural decisions about the test suite — which files to create, what factories and shared helpers are needed, and which criteria land in which file — so that the test implementation step can focus purely on writing test code without making organizational choices. It also owns **invalidation discovery**: when the feature changes behavior the existing suite already exercises, this command is where every affected existing test is found and dispositioned — mechanically, suite-wide (see **Invalidation Sweep Rules**) — never left for implementation or review to notice.
+This command takes the acceptance criteria (what to test) and produces a test plan (how to organize the tests). It makes structural decisions about the test suite — which files to create, what factories and shared helpers are needed, and which criteria and named required variants each evidence location establishes — so the test implementation step can focus on writing evidence while preserving the approved
+coverage and mechanical change contract. It also owns **invalidation discovery**: when the feature changes behavior the existing suite already exercises, this command is where every affected existing test is found and dispositioned — mechanically, suite-wide (see **Invalidation Sweep Rules**) — never left for implementation or review to notice.
 
 This is a **planning step**, not a writing step. No test code is produced. The output is a map that the implement-tests step will follow.
 
@@ -46,19 +47,22 @@ This is a **planning step**, not a writing step. No test code is produced. The o
 
 4. **Survey the existing test suite**:
    - List the configured test-owned files and runner inventory.
-   - For files that might overlap with this feature, read their structure (test groups, test names, shared setup, factories/fixtures). This informs placement and granularity (steps 5–8) only — it is NOT how invalidated tests are discovered; that is step 9's sweep.
+   - For files that might overlap with this feature, read their structure (test groups, test names, shared setup, factories/fixtures). Inspect actual assertions and setup before adopting EXISTS evidence for any required outcome/variant. This informs placement and granularity (steps 5–8) only — it is NOT how invalidated tests are discovered; that is step 9's sweep.
    - Note existing factories/fixtures, shared helpers, support files, and reusable modules.
    - Note the project's test file naming conventions and directory organization patterns.
    - Run `$(git config kaba.scriptdir)/snapshot-tests.sh identities` from the repo root and keep its output as a lookup artifact — the identity listing (address + description + file for every example in the current suite). On a large suite, write it to a scratch file and query it per address instead of holding it whole.
    - Derive the **contract-delta list** per the **Invalidation Sweep Rules** below: every observable behavior this feature changes (as opposed to adds), recorded as CD-1, CD-2, … with the old contract, the new contract, and its source. A purely additive feature records "no contract deltas" explicitly.
 
-5. **Design test file structure**: Apply the Criteria-to-File Mapping Rules below to assign every criterion to a test file. Decide which test layer/directory a behavior maps to via the **same placement order of authority** as step 3 (`architecture.md` → existing project/test conventions → framework default). If shaping a test (its layer, structure, or what it must assert) would require a production-code structural fact that isn't established, STOP and escalate immediately per **Resolution Chain & Escalation**.
+5. **Design test file structure**: Apply the Criteria-to-Evidence Mapping Rules below to assign every behavioral criterion and its required variants to evidence locations. Decide which test layer/directory a behavior maps to via the **same placement order of authority** as step 3 (`architecture.md` → existing project/test conventions → framework default). If shaping a test (its layer, structure, or what it must assert) would require a production-code structural fact that isn't established, STOP and escalate immediately per **Resolution Chain & Escalation**.
 
 6. **Identify factory needs**: Apply the Factory Rules below for every entity referenced in the acceptance criteria.
 
 7. **Identify shared helpers**: Apply the Shared Helper Rules below for repeated patterns across test files.
 
-8. **Map criteria to files**: Produce the Criteria Mapping table. Every criterion ID from the acceptance criteria document MUST appear in exactly one row.
+8. **Map criteria to files**: Produce the Criteria Mapping table. Every behavioral criterion ID and every named required variant MUST have explicit evidence
+   coverage. Use multiple rows when needed; coherent tests may cover several criteria. Record
+   non-automated runtime evidence with a concrete location/procedure and expected result.
+   Preserve Delivery Obligations separately without forcing them into test files.
 
 9. **Run the invalidation sweep**: Apply the **Invalidation Sweep Rules** below to every contract delta from step 4 — derive probes, run them as content searches over all configured test-owned source paths, resolve hits to examples via the step-4 identity listing, and disposition every hit example as KEEP, MODIFY, or REMOVE. Record probes, hits, and dispositions for the plan's Invalidation Sweep section. If step 4 recorded no contract deltas, record that and continue.
 
@@ -150,13 +154,20 @@ A re-run may carry an `## ESCALATION — test-plan defect` block from `implement
 
 An amendment re-run still passes through step 1's prior-run gate — the plan files exist, so it will ask. That is expected, not an error state: the amendment regenerates `test-plan.json` whole, so the previous version really is being destroyed. Answer the gate, mention the escalation as the reason, and continue.
 
-## Criteria-to-File Mapping Rules
+## Criteria-to-Evidence Mapping Rules
 
-**CRITICAL**: Every criterion from the acceptance criteria document MUST be assigned to exactly one test file. No criterion may be left unmapped. No criterion may appear in more than one file.
+**CRITICAL**: Map every behavioral criterion, its related outcomes, and each named required
+variant to one or more evidence locations. Automated evidence names a test file and group/case;
+source/configuration inspection, command verification, and manual checks name a concrete artifact
+or procedure and expected result. Use several locations when they prove different outcomes;
+allow coherent tests to cover several criteria. Count unique criteria, not mapping rows.
+Delivery Obligations are a separate list of deliverables and completion checks, not test coverage.
+Runtime configuration behavior, security guarantees, deadlines, and real user-visible setup
+behavior remain behavioral criteria even when evidence is not an automated test.
 
 > Examples below use generic paths for illustration. Use your project's actual conventions for paths, extensions, and naming.
 
-### How to assign criteria to files
+### How to organize automated evidence
 
 1. **Same acceptance criteria category → same test file**, unless the category spans multiple test layers (e.g., a category that mixes model validations with request-level behavior should be split by layer).
 
@@ -178,7 +189,7 @@ An amendment re-run still passes through step 1's prior-run gate — the plan fi
 - ✅ CORRECT: All authentication criteria → `tests/requests/authentication_test` (cross-cutting concern, one file)
 - ✅ CORRECT: All create-endpoint criteria → `tests/requests/items/create_test` (one endpoint per file)
 - ✅ CORRECT: All scoping criteria → `tests/requests/items/scoping_test` (cross-cutting concern across endpoints)
-- ❌ WRONG: `VAL-001` in both a model test AND a request test (criterion in two files)
+- ✅ CORRECT: `VAL-001` in a model test and request test when each establishes explicitly mapped outcomes or variants
 - ❌ WRONG: Create, update, and delete criteria all in one file (multiple endpoints in one file — too coarse)
 - ❌ WRONG: `AUTH-001` in the create test, `AUTH-002` in the list test, `AUTH-003` in the show test (cross-cutting concern scattered across endpoint files)
 - ❌ WRONG: Model-behavior criteria tested in a request test (wrong layer)
@@ -345,15 +356,19 @@ The sweep's cost is proportional to the change's blast radius (hits), never to s
 
 Before writing the plan document, verify ALL of the following. If any check fails, fix the plan first.
 
-1. **Complete coverage**: Every criterion ID from acceptance-criteria.md appears in exactly one test file's Criteria list. Count them — the total MUST equal the acceptance criteria Summary total.
-2. **No duplicates**: No criterion ID appears in more than one test file's Criteria list.
+1. **Complete coverage**: Every behavioral criterion, required outcome, and named variant has
+   explicit evidence in the mapping. Count unique criteria — the total MUST equal the acceptance
+   criteria Summary total. Delivery Obligations retain separate completion checks.
+2. **Coverage accountability**: Repeated IDs across locations identify the outcomes/variants each
+   proves; no required variant is silently omitted or counted as covered by a test name.
 3. **No empty files**: Every test file listed covers at least one criterion.
-4. **Describe blocks map to criteria**: Every criterion ID in a file's Criteria list appears in exactly one `covers:` line in that file's Describe blocks section.
+4. **Describe blocks map to criteria**: Every criterion ID in a file's Criteria list appears in at least one `covers:` line, with required outcomes/variants identified in that file's Describe blocks section.
 5. **Factory completeness**: Every factory referenced in any test file's Dependencies list appears in the Factories section with status NEW, MODIFY, or EXISTS.
 6. **Helper completeness**: Every shared helper referenced in any test file's Dependencies list appears in the Shared Helpers section.
 7. **Used-by consistency**: Every test file that lists a factory or helper in Dependencies appears in that factory/helper's Used-by list, and vice versa.
 8. **Path conventions**: All file paths use the project's actual naming conventions, extensions, and directory layout.
-9. **Criteria Mapping table matches**: The Criteria Mapping table at the end is a 1:1 match with the per-file Criteria lists — same criterion, same file, no discrepancies.
+9. **Criteria Mapping table matches**: The Criteria Mapping table matches the per-file coverage lists and non-automated
+   evidence entries — same criteria, outcomes/variants, and locations, with no discrepancies.
 10. **State-change entries resolve**: Every Planned State Changes row's identity exists in the step-4 identity listing (a group address must match at least one example), and its description equals the listing's recorded description byte-for-byte (for a group address: every matched example's description starts with it). A row that fails is a plan error — fix it from the listing, never by editing the string freehand. PIN rows are checked in the inverse direction: their file + description must match NO example in the identity listing — a PIN that matches an existing example is a plan error (it should be a TOUCH or MODIFY).
 11. **MODIFY consistency**: Test File headings marked MODIFY and the Planned State Changes table agree in both directions.
 12. **Removal reasons**: Every REMOVE row has a concrete reason traceable to the spec.
@@ -380,7 +395,7 @@ Otherwise the report MUST include:
 
 ## Validation
 - [ ] Complete coverage: [PASS/FAIL]
-- [ ] No duplicates: [PASS/FAIL]
+- [ ] Coverage accountability: [PASS/FAIL]
 - [ ] No empty files: [PASS/FAIL]
 - [ ] Describe blocks map to criteria: [PASS/FAIL]
 - [ ] Factory completeness: [PASS/FAIL]
@@ -407,7 +422,10 @@ If ANY validation check is FAIL, do NOT proceed. Fix the plan and re-validate.
 - **Follow existing conventions.** If the project already has test files, match their naming, directory layout, and organizational patterns. Do NOT impose a new structure.
 - **Factories are first-class.** Every entity that needs test data MUST have a factory in the Factories section. Do NOT assume factories will be created ad-hoc during implementation.
 - **Shared helpers reduce duplication.** 3+ files with the same pattern → MUST extract. 2 files → use judgment. 1 file → do NOT extract.
-- **The plan is a contract.** The implement-tests step will follow this plan exactly — file paths, criterion mapping, factory names, describe block structure. Changes after this point require re-planning.
+- **The plan is a contract.** Coverage, authorized paths, existing identities, and state-change
+  entries are binding. Incidental test organization within those bounds may be adjusted and
+  reported for review; coverage/ownership/identity/state-change changes require re-planning.
+  The machine JSON and its validated lock remain untouched.
 - **Flag, don't guess.** If an organizational decision depends on an implementation detail not yet known *but the behavior is still testable at the boundary*, add a `**Notes**` field to the affected entry explaining the uncertainty and proceed. Do NOT silently pick an option. (But if the unknown actually blocks shaping a behavior test — a not-yet-established architectural fact — STOP and escalate instead; see **Resolution Chain & Escalation**.)
 - **Use the project's language and conventions.** All file paths, extensions, naming patterns, and terminology MUST match what the project actually uses. Do NOT default to any specific language or framework.
 - **Make no architectural or library decisions.** Plan only the two goals — behavior tests and alignment with existing architecture. If a placement or structure decision needs a not-yet-established production-code fact, STOP and escalate per **Resolution Chain & Escalation**. Test at the behavioral boundary so implementation unknowns (e.g. which library) do NOT block planning.
@@ -418,5 +436,6 @@ If ANY validation check is FAIL, do NOT proceed. Fix the plan and re-validate.
 
 With `test-plan.md` and `test-plan.json` written, point the user at `/kaba:implement-tests`, which
 writes the test code against this plan and validates `test-plan.json` against the baseline before
-any test code is written. The plan is a contract from here on: changes require re-running this
-command, never an edit from the test or implementation session.
+any test code is written. Coverage, paths, identities, and state changes remain binding. Incidental organization
+adjustments within those bounds are reported for review; contract amendments require re-running
+this command, never editing the plan from the test or implementation session.

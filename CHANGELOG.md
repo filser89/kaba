@@ -10,6 +10,8 @@
 
 ### Changed
 
+- Group behavioral criteria with explicit variants and evidence mappings; carry separate delivery obligations through implementation, and require independent review of corrected tests.
+
 - Preserved `review-tests` conversation isolation in Codex by delegating to a fresh-context reviewer when native forked skill execution is unavailable.
 - Made SessionStart rewiring resolve Codex's `cwd` payload and the active installed plugin path.
 
@@ -21,6 +23,8 @@
 - Added AST-based snapshot checks that detect status-preserving test edits.
 
 ### Changed
+
+- Group behavioral criteria with explicit variants and evidence mappings; carry separate delivery obligations through implementation, and require independent review of corrected tests.
 
 - Moved plugin commands to skills while preserving the existing `/kaba:<name>` interface.
 - Isolated `review-tests` in a forked context so it reviews without the implementer's conversation history.

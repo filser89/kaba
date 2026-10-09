@@ -28,7 +28,7 @@ You **MUST** consider the user input before proceeding (if not empty). The user 
 
 2. **Load context**:
    - **REQUIRED**: Read `FEATURE_DIR/test-plan.md` — the structural contract (files, describe blocks, criteria mapping, factories, helpers). If missing, ERROR and stop — suggest running `/kaba:plan-tests` first.
-   - **REQUIRED**: Read `FEATURE_DIR/acceptance-criteria.md` — the behavioral contract (what each criterion asserts). If missing, ERROR and stop.
+   - **REQUIRED**: Read `FEATURE_DIR/acceptance-criteria.md` — the behavioral contract (preconditions, triggers, related outcomes, required variants, and evidence kinds). If missing, ERROR and stop.
    - **REQUIRED**: Read `FEATURE_DIR/spec.md` — the feature spec (domain understanding). If missing, ERROR and stop.
    - Read `CLAUDE.md` for project conventions (test framework, banned patterns, style rules).
    - Read the project rules (CLAUDE.md/AGENTS.md, per `.kaba/config.yml`'s `rules_files`) for project-wide constraints.
@@ -58,11 +58,13 @@ You **MUST** consider the user input before proceeding (if not empty). The user 
 6. **Implement test files** — work through every test file listed in test-plan.md's Test Files section:
    - **Order**: Foundations first (model/unit tests), then integration/request tests, then cross-cutting tests. Follow the dependency graph implied by the test plan.
    - **For each NEW file**:
-     - Create the describe/context/it block hierarchy matching test-plan.md's Describe Blocks exactly.
+     - Use the planned hierarchy as the starting organization. Reviewable incidental organization
+       adjustments are allowed within authorized paths while preserving coverage and exact
+       PIN/existing identities; record them in the completion report.
      - Write test blocks with descriptive names derived from the acceptance criteria.
      - Each test block must contain a real assertion that exercises the criterion's behavior.
      - **Pin examples are contract**: an example backing a PIN entry must carry the plan's full description byte-for-byte (describe path + example description) — compare matches pins by exact file + description, and a wording drift lands as a "new test should be failed" violation with an unmatched-PIN hint.
-     - **Mark each criterion in source: RSpec uses trailing `# CRITERION-ID`; Go uses `// CRITERION-ID` beside its function/subtest/table row** naming the criterion it covers (e.g. `it "rejects blank name" do # VAL-001`). review-tests and fix-tests locate tests by this marker; it is prose for them, never parsed by scripts.
+     - **Mark each criterion in source: RSpec uses trailing `# CRITERION-ID`; Go uses `// CRITERION-ID` beside its function/subtest/table row** naming every criterion it covers (e.g. `it "rejects blank name" do # VAL-001`). review-tests and fix-tests locate tests by this marker; it is prose for them, never parsed by scripts.
    - **For each MODIFY file**:
      - Read the existing file first to understand its current structure.
      - Add new describe/context/it blocks as specified in test-plan.md's Describe Blocks for this file.
@@ -70,17 +72,27 @@ You **MUST** consider the user input before proceeding (if not empty). The user 
      - For RSpec, append new blocks after existing siblings to preserve positional addresses. Go rows have stable names; follow the supported source convention in the runner reference.
      - Integrate new blocks into the existing hierarchy — match the file's current style and conventions.
    - **For each REMOVE entry in the plan's Planned State Changes**: do not delete the test. Mark it skipped with the removal marker, using the project's framework idiom (per CLAUDE.md), carrying the feature name — e.g. for RSpec: `it "original description", skip: "REMOVED by 004-feature-name" do`. For Go, use the supported leaf `t.Skip` or table `removedBy` convention in the runner reference. The test must report as pending at post-test.
-   - **For all test files**: Tests MUST fail because implementation is missing (correct failure), not because of syntax errors or misconfigured support files (incorrect failure).
+   - **For all test files**: New behavior tests normally fail because implementation is missing. Planned PIN/passed and
+     conforming MODIFY/passed are legitimate green evidence. Syntax/collection errors or
+     misconfigured support files are never valid behavioral failures.
    - **Tests must register before implementation exists**: For RSpec, resolve missing production constants lazily inside examples/factories rather than at collection time. For Go, use the runner reference's validated compilation scaffold convention for missing declarations. Source discovery plus complete runtime outcomes are required; a compile error, failed setup hiding children, or package-aborting placeholder invalidates capture. Missing production behavior must produce real failed assertions.
    - **After each file**: Report which file was created or modified and how many criteria it covers.
+
+   - **Non-automated runtime evidence**: Perform mapped inspections/checks that are possible
+     without implementation writes; report exact evidence/results. Mark checks requiring the
+     implementation as pending, with their procedure and expected outcome for the code session.
+     Documentation and other Delivery Obligations are carried forward separately.
 
 7. **Snapshot post-test and compare**:
    1. Run `$(git config kaba.scriptdir)/snapshot-tests.sh capture post-test`
    2. Run `$(git config kaba.scriptdir)/snapshot-tests.sh compare post-test` — the script resolves both snapshots and `test-plan.json` from the feature directory itself and dies if the plan file is missing or not schema v3.
    - **If compare FAILS**, diagnose by violation type:
-     - New test not failed → assertions are trivially true (or a REMOVE marker landed on the wrong test). Fix the assertions so they exercise real behavior.
+     - New test not failed → inspect the assertions, actual behavior, PIN matching, and removal
+       markers. A matched PIN/passed is valid. If the behavior already conforms but no PIN was
+       planned, escalate the plan defect; never manufacture a red failure or weaken assertions.
      - Changed test not in the allowlist → either support files broke existing test setup (fix without altering existing behavior), or the plan is missing an entry — that is a test-plan defect: STOP and escalate (see Escalation below). Never "fix" this by touching test-plan.json.
-     - Allowlisted MODIFY not landing on its expected landing → the result contradicts the planned transition. Strengthen or correct the assertion; transitions to pending are never excused for MODIFY.
+     - Allowlisted MODIFY not landing on its expected landing → the result contradicts the planned transition. Inspect the actual assertion and result; fix incorrect evidence or escalate a mistaken
+       planned landing. MODIFY/passed is legitimate when conforming; pending is never excused.
      - REMOVE entry not pending → the removal marker is missing or on the wrong test.
      - Unexpected removals → an existing test was deleted or blocks were reordered. Restore from version control; removal is never done by deletion in-session.
      - Allowlisted PIN not landing passed → the pinned behavior does not actually conform. That contradicts the plan's premise: STOP and escalate (test-plan defect) — never "fix" it by weakening the example into passing.
@@ -100,13 +112,19 @@ You **MUST** consider the user input before proceeding (if not empty). The user 
    - Test files: [N] new, [N] modified, [N] existing (of [N] total in plan)
    - Factories: [N] new, [N] modified, [N] existing (of [N] total in plan)
    - Shared helpers: [N] new, [N] modified, [N] existing (of [N] total in plan)
-   - Criteria covered: [N] / [N] (MUST equal test-plan total — if not, ERROR)
+   - Behavioral criteria mapped: [N] / [N] unique IDs
+   - Required outcomes/variants with automated evidence: [N] / [N] planned
+   - Non-automated runtime evidence: [locations/results or explicitly pending implementation checks]
+   - Delivery Obligations: [separate checks carried forward, not claimed completed by green tests]
+   - Incidental organization adjustments: [paths and preserved coverage/identities, or none]
    - Snapshot comparison: PASS / FAIL
    - Allowlist warnings: [list of unused MODIFY entries, or "none"]
    - Quality check: PASS / FAIL
    ```
 
-   If ANY check is FAIL or criteria count does not match, do NOT proceed. Fix and re-validate.
+   If ANY gate is FAIL or planned automated outcomes/variants are missing, do NOT proceed.
+   Mark non-automated runtime checks pending when they need the implementation; carry their
+   procedure and expected results into the handoff rather than claiming them proven. Fix and re-validate.
 
 ## Escalation — test-plan defect
 
@@ -126,10 +144,17 @@ The human re-runs `/kaba:plan-tests` with this block as input; it regenerates th
 
 ## Key Rules
 
-1. **Only test files.** Do NOT create models, controllers, routes, migrations, or any implementation code. Tests should fail because the implementation is missing — that's correct.
-2. **Follow the test plan exactly.** File paths, describe-block hierarchy, criterion mapping, factory names — all frozen by test-plan.md. Do not reorganize, rename, or add structure beyond what the plan specifies.
-3. **Every criterion gets a test.** Each criterion ID from the Criteria Mapping table must appear as a tested behavior. No criterion may be skipped.
-4. **Tests must fail for the right reason.** Missing implementation is a correct failure. Syntax errors, factory misconfiguration, or missing requires are incorrect failures. Run the test suite periodically during implementation to catch setup errors early.
+1. **Only test files.** Do NOT create models, controllers, routes, migrations, or any implementation code. Ordinary new behavior tests fail because implementation is missing; planned legitimate green
+   evidence remains valid.
+2. **Preserve the planned contract.** Coverage, authorized paths, existing identities, exact PIN
+   descriptions, and state-change entries remain fixed. Incidental organization within those
+   bounds may be adjusted and reported for review; this never authorizes an out-of-plan existing
+   test edit, status transition, identity drift, or a JSON/lock edit.
+3. **Every required behavior gets evidence.** Implement every planned automated outcome and
+   named variant with real assertions. One coherent test may cover several criteria; one
+   criterion may use several evidence locations. Keep non-automated runtime checks visible and
+   carry Delivery Obligations forward without fake tests.
+4. **Results must match the approved landing for the right reason.** Missing implementation is a correct failure; planned PIN/passed and conforming MODIFY/passed are valid. Syntax errors, factory misconfiguration, or missing requires are incorrect failures. Run the test suite periodically during implementation to catch setup errors early.
 5. **No banned patterns.** `$(git config kaba.scriptdir)/banned-patterns.sh` codifies the greppable banned patterns from the project rules. Private method testing is also banned but requires judgment — it cannot be detected mechanically.
 6. **Respect existing infrastructure.** Do not modify existing test configuration or support files. Add new files; don't overwrite existing ones.
 7. **The test plan is a contract, and its allowlist is the gate's input.** If the plan has errors or gaps, STOP and emit the test-plan defect escalation — do not silently deviate, and never edit test-plan.md or test-plan.json from this session. Re-planning belongs to `/kaba:plan-tests`. The lock (`snapshots/test-plan.lock.json`) makes this mechanical — compare fails on any in-session plan edit.

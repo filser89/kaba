@@ -15,7 +15,7 @@ Standard AI coding agents don't do TDD. When told "use TDD," they write code fir
 1. **Tests are easier to review than code** — especially with shoulda syntax (reads like English). If the tests are correct, the implementation is reviewable by the test suite itself.
 2. **Mechanical checks catch drift** — git hooks and inline end gates reject boundary violations during the normal verified workflow. They are guardrails for a cooperating agent, not security against a hostile one.
 3. **Test snapshots catch regressions** — by recording which tests are red/green before and after each session, you detect unintended side effects automatically.
-4. **Separation of concerns** — the agent can't write tests that are biased toward its own implementation because it hasn't written the implementation yet.
+4. **Separation of concerns** — separate test-author and implementation sessions reduce bias toward a particular implementation. Independent source/evidence review checks the remaining assumptions and coverage gaps.
 5. **Existing tooling handles code quality** — the project's own linter and any suite-embedded checks (e.g. N+1 detection) are pass/fail commands. No need to prompt for these.
 
 ### Two-Session Architecture
@@ -47,26 +47,35 @@ The agent does the typing. The human does the thinking (what to test, what the c
 
 | Step | Command / Action | Purpose | Output |
 |------|-----------------|---------|--------|
-| 5 | `/kaba:acceptance-criteria` | Decompose spec into granular, test-oriented criteria | `FEATURE_DIR/acceptance-criteria.md` |
-| 6 | `/kaba:plan-tests` | Plan test organization — files, factories, helpers, criterion mapping, state-change allowlist. Also serves as the task list for implement-tests (no separate tasks step needed). | `FEATURE_DIR/test-plan.md` + `test-plan.json` |
+| 5 | `/kaba:acceptance-criteria` | Derive grouped behavioral criteria with explicit variants/evidence and separate Delivery Obligations | `FEATURE_DIR/acceptance-criteria.md` |
+| 6 | `/kaba:plan-tests` | Plan test organization — files, factories, helpers, outcome/variant evidence mapping, state-change allowlist. Also serves as the task list for implement-tests (no separate tasks step needed). | `FEATURE_DIR/test-plan.md` + `test-plan.json` |
 | 7 | Snapshot: capture baseline | Run test suite, save state to file | `FEATURE_DIR/snapshots/baseline.json` |
 | 8 | `/kaba:implement-tests` | Agent writes all test code following the test plan. Only permitted test-session paths. | Tests and support files under configured ownership patterns |
 | 9 | Snapshot: capture post-test | Run test suite, save state to file | `FEATURE_DIR/snapshots/post-test.json` |
 | 10 | Snapshot: compare | Compare post-test vs baseline (see Snapshot Comparison Rules) | Pass/fail report |
 | 11 | Script: banned patterns | Runner-specific source quality — Go supported registrations/removal markers, or RSpec message-expectation/any-instance/`respond_to` bans | Pass/fail |
 | 12 | `/kaba:review-tests` | Agent review — "could a terrible implementation pass these tests?" | Structured findings report |
-| 13 | `/kaba:fix-tests` | *(optional — only on a NO-GO verdict)* Apply the review findings to the test files — mechanical fixes directly, escalated findings resolved with the human — then re-validate (snapshot + banned-pattern scan) | Updated test files + `FEATURE_DIR/test-fixes.md` |
-| 14 | Human review | Review test descriptions and agent findings. Final go/no-go. | Go/no-go |
+| 13 | `/kaba:fix-tests` | *(optional — only on a NO-GO verdict)* Apply the review findings to the test files — mechanical fixes directly, escalated findings resolved with the human — then re-validate (snapshot + banned-pattern scan) and request independent scoped review | Updated test files + `FEATURE_DIR/test-fixes.md` |
+| 14 | Human review | Review test descriptions, coverage/evidence, planned delivery checks, and independent findings after corrections. Final go/no-go. | Go/no-go |
 
 #### Phase 3: Implementation Session
 
 | Step | Command / Action | Purpose | Output |
 |------|-----------------|---------|--------|
 | 15 | `/kaba:plan-code` | Plan implementation informed by the locked tests — components, schema, decisions, build order | `FEATURE_DIR/code-plan.md` |
-| 16 | `/kaba:implement-code` | Agent writes code to make feature tests green. Cannot touch test-owned files. | Implementation files |
+| 16 | `/kaba:implement-code` | Agent implements approved behavior, greens locked tests, completes Delivery Obligations and non-automated runtime checks. Cannot touch test-owned files. | Implementation files |
 | 17 | Snapshot: capture post-impl | Run test suite, save state to file | `FEATURE_DIR/snapshots/post-impl.json` |
 | 18 | Snapshot: compare | Compare post-impl vs post-test (see Snapshot Comparison Rules) | Pass/fail report |
 | 19 | Gate: linter | The project's configured linter (`linter_command`) must pass; any suite-embedded checks (e.g. N+1 detection) ride along for free inside the same green `test_command` run | Pass/fail |
+
+Behavioral coverage maps each criterion's related outcomes and named required variants to one
+or more evidence locations; coherent tests can cover several criteria. Manual, command, and
+source/configuration runtime checks remain explicit. Delivery Obligations preserve documentation,
+configuration examples, CI/setup verification, and completion tasks separately. Runtime configuration
+behavior, security guarantees, deadlines, and user-visible setup behavior remain behavioral
+requirements. Snapshot gates protect suite state and identities; source/evidence completeness is
+reviewed by the agent and human. Corrected tests return to an independent scoped reviewer, whose
+report preserves unaffected findings, before human acceptance and the fresh implementation session.
 
 Steps 17–19 run **inline inside `/kaba:implement-code`** as end gates (same pattern as implement-tests owning its snapshot steps), plus a fourth inline gate: `session-lock.sh check-dirty implement` must pass for all changed paths. Go snapshots also compare the complete protected file inventory, including ignored fixtures and helpers.
 

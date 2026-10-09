@@ -1,6 +1,6 @@
 # Implementation Plan: [FEATURE]
 
-**Feature**: `[###-feature-name]` | **Date**: [DATE] | **Spec**: [link to spec.md]
+**Feature**: `[###-feature-name]` | **Spec**: [link to spec.md]
 **Tests**: [link to the locked test directory / suite this plan satisfies]
 
 **Note**: This template is filled in by the `/kaba:plan-code` command. See `templates/code-plan-template.md` in the kaba plugin for the format reference. All paths, names, and conventions MUST use the project's actual conventions.
@@ -85,6 +85,23 @@
 
 [The delta, or "None — reuses existing patterns".]
 
+## Runtime Evidence
+
+| Criterion ID | Required outcomes / named variants | Evidence kind | Location / procedure | Expected result |
+|---|---|---|---|---|
+| [ID] | [outcomes/variants not established by automated tests] | [source/configuration inspection / command verification / manual check] | [concrete artifact/procedure] | [required observable result] |
+
+<!-- Preserve every non-automated runtime check from approved criteria/test plan. Pending
+checks requiring implementation stay explicit until verified; do not count green tests as proof. -->
+
+## Delivery Obligations
+
+| Obligation ID | Source | Deliverable / target path | Completion check |
+|---|---|---|---|
+| [DO-NNN] | [spec reference] | [documentation, configuration example, CI/setup verification, or completion task and path] | [concrete review/check] |
+
+<!-- Carry every known task from spec.md. These are completion work, not fake test criteria. -->
+
 ## Build Order
 
 <!--
@@ -97,4 +114,4 @@
   4. orders list endpoint + route → greens tests/requests/orders/list
 -->
 
-1. [unit] → greens [test file / group]
+1. [unit] → greens [test file / group] or completes [DO-NNN / runtime evidence check]

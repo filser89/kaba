@@ -59,7 +59,7 @@ If `ACCEPTANCE` is missing, ERROR and stop — suggest running `/kaba:acceptance
 ### 2. Load context
 
 - **REQUIRED**: Read `TEST_REVIEW` — the findings to process.
-- **REQUIRED**: Read `ACCEPTANCE` — the behavioral contract (each criterion's ID and assertion).
+- **REQUIRED**: Read `ACCEPTANCE` — the behavioral contract (each criterion's ID, behavior, related outcomes, required variants, and evidence kinds).
 - Read `SPEC` for domain understanding.
 - Read `CLAUDE.md` for project test conventions and banned patterns.
 - Read the project rules (CLAUDE.md/AGENTS.md, per `.kaba/config.yml`'s `rules_files`) for
@@ -75,6 +75,10 @@ fix-tests out of habit or as part of a scripted flow.
 ### 4. Classify findings
 
 For each finding in the report's Findings table, classify as **mechanical** or **escalated**.
+An upstream missing requirement/criterion/evidence-plan entry or Delivery Obligation check is
+not a same-file test fix. Report the precise source and missing contract mapping for the human
+to resolve through specify/clarify/acceptance-criteria/plan-tests as appropriate; never invent
+policy, edit those artifacts here, or manufacture a test for a delivery task.
 
 **Mechanical** — the agent knows the exact fix and it stays within the same file without side
 effects:
@@ -99,7 +103,7 @@ For each mechanical finding:
 1. Read the test file.
 2. Locate the test block via the criterion ID marker (the `# CRITERION-ID` (RSpec) or `// CRITERION-ID` (Go) comment placed
    by `/kaba:implement-tests`).
-3. Read the criterion's assertion text from `ACCEPTANCE` to confirm what the test must verify.
+3. Read the criterion's behavior, related outcomes, and required variants from `ACCEPTANCE` to confirm what the test must verify.
 4. Apply the recommended change from the finding's Recommendation column.
 5. Log to the in-memory report with status FIXED, including:
    - Finding ID and criterion ID
@@ -116,7 +120,7 @@ at a time:
 ````
 ## Escalated Finding: [FindingID] — [CRITERION-ID]
 
-**Criterion**: [CRITERION-ID] — "[full assertion text from acceptance-criteria.md]"
+**Criterion**: [CRITERION-ID] — "[full behavior, related outcomes, and required variants from acceptance-criteria.md]"
 
 **Weakness**: [weakness description from test-review.md]
 
@@ -125,7 +129,7 @@ at a time:
 [the actual test code block from the test file]
 ```
 
-**Passing stub**: [stub from test-review.md proving the weakness]
+**Counterexample / evidence**: [passing incorrect implementation, rejected conforming implementation, or sourced gap evidence from test-review.md]
 
 **Why escalated**: [specific reason — what makes this cross-file, uncertain, or multi-option]
 
@@ -161,33 +165,32 @@ After all fixes (mechanical + resolved escalations) are applied:
    chain stays clean: baseline → post-test (now updated) → post-impl later.
 2. **Snapshot compare**: Run `$(git config kaba.scriptdir)/snapshot-tests.sh compare post-test` — the
    script resolves both snapshots and `test-plan.json` from the feature directory itself.
-   All new tests must still be red (failed). No test should have accidentally become green from
-   the fix. Appended allowlist entries (step 6) are printed by the compare under
+   Results must satisfy the approved schema-v3 action/landing contract. Ordinary new behavior
+   tests remain failed; matched PIN/passed and conforming MODIFY/passed are legitimate green
+   evidence, TOUCH preserves status, and REMOVE stays pending. Appended entries are printed under
    `ALLOWLIST` section — confirm the appended list matches exactly the
    approvals logged in this session, and carry it into the report.
 3. **Banned pattern scan**: Run `$(git config kaba.scriptdir)/banned-patterns.sh` with the paths of all
    modified test files as positional arguments. If it reports FAIL, the fix introduced a banned
    pattern — rework the fix and re-run until PASS.
 
-- **If snapshot compare FAILS**: A test accidentally became green. The fix made an assertion
-  trivially true. Undo/rework the offending fix so the test fails for the right reason (missing
-  implementation). Re-capture and re-compare. Repeat until PASS.
+- **If snapshot compare FAILS**: Diagnose the reported violation using implement-tests step 7:
+  unexpected status, unmatched PIN identity, digest drift, missing outcome, protected-file
+  change, or plan-lock mismatch are different failures. Correct incorrect evidence or restore
+  unauthorized edits; escalate a genuine plan defect. Never make already-conforming behavior
+  fail artificially or weaken assertions to satisfy a landing. Re-capture/re-compare after fixes.
 - **If banned patterns are found**: The fix introduced a banned pattern. Rework the fix to avoid
   the pattern. Re-scan. Repeat until PASS.
 
-4. **Scoped re-review**: Collect the criterion IDs from all findings with status FIXED or RESOLVED
-   (not SKIPPED). If the list is non-empty, run a scoped review on those criteria — follow the
-   same detection logic as `/kaba:review-tests` steps 3–8 (build review map, detection passes,
-   stub proof, severity, write report, verdict) but scoped to those criteria only. Write the
-   scoped review report to `FEATURE_DIR/test-review.md`.
-
-   - If the scoped re-review finds **no weakness** on any fixed criterion: the fixes are verified.
-     Report: "Scoped re-review: PASS — all [N] fixed criteria cleared."
-   - If weaknesses **remain** on some fixed criteria: rework the fix using the updated finding and
-     re-run the scoped re-review. Repeat until all fixed criteria clear or 3 attempts have been
-     made. If still unresolved after 3 attempts, report the remaining findings and stop — the
-     problem needs human judgment.
-   - If the FIXED/RESOLVED list is empty (all findings were SKIPPED): skip the scoped re-review.
+4. **Independent scoped re-review**: Collect criterion/source IDs from all FIXED or RESOLVED
+   findings and record the exact changed paths plus any coverage/organization consequences.
+   Do not re-review your own corrections or edit `test-review.md`. Write `test-fixes.md`, then
+   direct the human to invoke `/kaba:review-tests <IDs>` in its isolated reviewer context. The
+   fresh reviewer follows that skill's source/evidence checks and scoped finding merge, retaining
+   unaffected findings and recomputing the full remaining verdict. If an upstream amendment
+   changes broader coverage, request a full review instead. Until that review returns, report
+   correction review as PENDING; passing mechanical gates alone does not establish readiness.
+   If no findings were fixed, report SKIPPED and preserve the existing review.
 
 ### 8. Write report
 
@@ -203,15 +206,17 @@ Print a summary to the conversation:
 - Skipped: [N] (omit line if 0)
 - Snapshot compare: PASS / FAIL
 - Banned pattern scan: PASS / FAIL
-- Scoped re-review: PASS / FAIL / SKIPPED (no fixed criteria)
+- Independent re-review: PENDING / SKIPPED (no fixed criteria)
 - Next step: [see guidance below]
 ```
 
-**Next step guidance** (choose the appropriate one):
-- Scoped re-review PASS, no skipped findings: `"Proceed to human review — the test suite is ready for Phase 3."`
-- Scoped re-review PASS, some findings skipped: `"Proceed to human review — fixed criteria cleared, but [N] findings were skipped (accepted risk). Run /kaba:review-tests for a full re-review if needed."`
-- Scoped re-review FAIL (after retries exhausted): `"[N] criteria could not be resolved after 3 attempts. Review test-review.md — these need human judgment."`
-- Scoped re-review SKIPPED: `"No findings were fixed — run /kaba:review-tests for a full re-review."`
+**Next step guidance**:
+- Corrections applied and gates passed: request `/kaba:review-tests <criterion/source IDs>` with
+  independent context and scoped merge; report PENDING until reviewed. Broader upstream
+  amendments require a full review.
+- No corrections applied: preserve the findings and report the unresolved/skipped scope.
+- Only after independent review may the human make the final go/no-go decision for Phase 3.
+  This command never self-approves the corrected suite.
 
 ## Report Format
 
@@ -288,16 +293,18 @@ After:
 3. **Every mechanical fix must be verifiable.** The before/after in `test-fixes.md` makes the
    change auditable.
 4. **Escalated findings get full context.** Criterion text (from acceptance-criteria.md), weakness,
-   current code with file:line, passing stub, why escalated, options with trade-offs and
+   current code with file:line, concrete counterexample/evidence, why escalated, options with trade-offs and
    recommendation. The human must be able to make an informed decision without looking anything up.
 5. **Human can ask questions before choosing.** No pressure to commit — the agent answers
    follow-ups and re-presents options until the human decides.
 6. **Overwrite post-test snapshot.** The post-fix state becomes the new post-test for the
    baseline → post-test → post-impl chain.
-7. **Re-validate after all fixes.** Snapshot compare (all still red) +
-   `$(git config kaba.scriptdir)/banned-patterns.sh` + scoped re-review of fixed criteria. Do not
+7. **Re-validate after all fixes.** Snapshot compare (approved action/landing contract) +
+   `$(git config kaba.scriptdir)/banned-patterns.sh` + independent scoped re-review of fixed criteria/source obligations. Do not
    proceed with a failing gate.
-8. **No automatic handoff.** The human decides when to re-run `/kaba:review-tests`.
+8. **No automatic handoff; independent review first.** The human invokes isolated `/kaba:review-tests` for
+   corrected scope; preserve unrelated findings. The author does not certify its own fixes or
+   declare readiness. Human final acceptance remains required.
 9. **GO verdict is a no-op, not an error.** Report and stop gracefully.
 10. **Project rules violations in fixes are forbidden.** Any fix that would introduce a banned
     pattern is itself a bug — fix the fix.

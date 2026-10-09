@@ -10,6 +10,12 @@ identities, execute complete uncached captures, compute structural source digest
 and perform source-aware cleanup. See [runner contracts](docs/test-runners.md) for
 supported Go source forms and command limits.
 
+Behavioral criteria preserve related outcomes and named input/state/failure variants, with
+explicit automated or non-automated runtime evidence. Documentation, configuration examples,
+CI/setup verification, and other completion work stay in separate Delivery Obligations. Test
+review checks sourced coverage and unnecessary implementation coupling; corrected tests require
+an independent review before human acceptance and a fresh implementation session.
+
 ## Install
 
 **Dependencies:**

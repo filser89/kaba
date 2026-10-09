@@ -34,18 +34,29 @@ You **MUST** consider the user input before proceeding (if not empty). The user 
    - Read the project rules (CLAUDE.md/AGENTS.md, per `.kaba/config.yml`'s `rules_files`) for project-wide constraints.
    - Read `.kaba/architecture.md` for the existing patterns the code must stay consistent with.
    - Identify test-owned paths from `.kaba/config.yml` and the classifier; explicit configurations have no `test_dir`.
-   - Do **NOT** read `spec.md`, `acceptance-criteria.md`, or `test-plan.md` — their content is absorbed into the plan and the locked tests. The plan says what to build; the tests referee it. Test files are read per build-order step as needed.
+   - Read approved `spec.md`, `acceptance-criteria.md`, and `test-plan.md` for source fidelity,
+     required outcomes/variants, non-automated runtime evidence, and Delivery Obligations.
+     Do not read the test-author conversation or its justifications. The plan guides the build;
+     locked tests remain protected. Report upstream contract/evidence gaps instead of inventing
+     policy or weakening tests.
 
 4. **Survey the existing codebase**: Read the project manifest and configuration, and the existing implementation directories, for patterns to follow (naming, base classes, module conventions). The plan's components follow `architecture.md`; the code must match how the project actually does things.
 
 5. **Execute the Build Order, step by step** — the Build Order in `code-plan.md` is the task list. For each step, in order:
-   - Re-read the step's entry in the plan's Components section: its responsibility, the test groups it greens, its collaborators, and any Decision verdicts that constrain it. Read the test files it claims to green — they are the precise behavioral contract.
+   - Re-read the step's entry in the plan's Components section: its responsibility, the test groups it greens, its collaborators, and any Decision verdicts that constrain it. Read the tests it claims to green and the approved outcomes/variants and delivery checks
+     assigned to the step. Complete documentation, configuration examples, CI/setup verification,
+     and other planned deliverables using authorized implementation/shared paths. Perform and
+     record non-automated runtime checks with exact evidence/results.
    - **Use the project's generators** where one exists for what's being created (per project conventions), **with any test-file scaffolding disabled** — a generator must never create or modify files in test-owned files. Generated test files would violate the session lock, conflict with the locked suite, and fail the post-impl compare as "new test added". The framework-specific flag comes from project conventions.
    - **Apply schema changes** through the project's standard mechanism (per conventions), ensuring the test environment sees them before tests run.
    - **Run the test files this step claims to green** using the project's test runner. Iterate until they pass. Earlier steps' tests must stay green; a wrong turn surfaces here, not after the last step.
    - **After each step**: Report which files were created or modified and which test groups went green.
 
-6. **End gates** — run in order; ALL must PASS:
+6. **Delivery verification and end gates**: First verify every Delivery Obligation and every
+   non-automated runtime outcome/variant with the plan's check. Record artifact locations and
+   actual results. Required manual checks that cannot be performed remain explicitly unverified;
+   report the blocker and do not declare full delivery complete. Green tests alone do not prove
+   these tasks. Then run the exact mechanical gates in order; ALL must PASS:
    1. **Snapshot capture**: Run `$(git config kaba.scriptdir)/snapshot-tests.sh capture post-impl` from the repo root. The capture aborts loudly on load errors — fix those first (they mean broken code, not missing implementation).
    2. **Snapshot compare**: Run `$(git config kaba.scriptdir)/snapshot-tests.sh compare post-impl` — the script resolves both snapshot paths from the feature directory itself.
    3. **Ownership gate**: Run `$(git config kaba.scriptdir)/session-lock.sh check-dirty implement`. It must pass for staged, unstaged, untracked, deleted, and both rename endpoints using the configured classifier. The Go snapshot also protects all test-owned file contents, including ignored helpers/fixtures/scaffolds.
@@ -70,7 +81,7 @@ You **MUST** consider the user input before proceeding (if not empty). The user 
 
    The human re-runs `/kaba:plan-code` (or amends the plan) and then re-runs this command. Re-runs are idempotent: for each build-order step whose test groups already pass, verify and skip.
 
-8. **Disarm the session lock**: Run `$(git config kaba.scriptdir)/session-lock.sh clear` from the repo root. All end gates have passed, so the two-session boundary for this feature is complete — the repo returns to unrestricted until the next test session arms the lock. A session that stops on a failed gate or an escalation (step 7) never reaches this step; the lock stays armed.
+8. **Disarm the session lock**: Run `$(git config kaba.scriptdir)/session-lock.sh clear` from the repo root. All end gates and required delivery/evidence checks have passed, so the two-session boundary for this feature is complete — the repo returns to unrestricted until the next test session arms the lock. A session that stops on a failed gate or an escalation (step 7) never reaches this step; the lock stays armed.
 
 9. **Completion report**:
 
@@ -81,9 +92,13 @@ You **MUST** consider the user input before proceeding (if not empty). The user 
    - Snapshot compare (post-impl): PASS / FAIL
    - Ownership gate: PASS / FAIL
    - Project quality command: PASS / FAIL
+   - Delivery Obligations: [DO-NNN → artifact and completion-check result]
+   - Non-automated runtime evidence: [criterion/variant → actual evidence/result]
+   - Unverified required checks: [none, or exact blocker]
    ```
 
-   If ANY gate is FAIL, do NOT report completion. Fix and re-validate, or escalate (step 7).
+   If ANY gate is FAIL or required delivery/evidence check is unverified, do NOT report full
+   completion or disarm the lock. Fix and re-validate, or escalate (step 7).
 
 ## Key Rules
 
@@ -95,7 +110,9 @@ You **MUST** consider the user input before proceeding (if not empty). The user 
 6. **Framework specifics come from project conventions, never from this command.** Ownership patterns, test runner, and quality command come from `.kaba/config.yml`; generator flags are resolved from CLAUDE.md and project structure at runtime.
 7. **Respect existing code.** Follow `architecture.md` and the patterns the codebase actually uses. Do not refactor existing code beyond what the plan calls for.
 8. **Never commit.** Finishing the work and committing it are separate; the human decides when to commit.
-9. **All gates must PASS before reporting done.** No partial-success completion reports.
+9. **All gates and required checks must PASS before reporting done.** Carry Delivery Obligations
+   and non-automated runtime evidence explicitly; disclose unverified checks and preserve the
+   lock while blocked. Do not assume green tests establish all non-test delivery work.
 10. **Gate exemptions: smallest unit, justified, or escalate.** Exemptions to any automated quality gate (N+1 detector, linter, type checker, and the like) MUST be scoped to the smallest unit that exhibits the justified pattern — a single test, line, or code path — never a whole file or directory. Every exemption MUST carry a documented justification at the exemption site. If the gate's tooling cannot express an exemption that narrow, escalate rather than widen.
 
 ## Next Step

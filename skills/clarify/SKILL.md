@@ -19,12 +19,10 @@ You **MUST** consider the user input before proceeding (if not empty).
 Detect and reduce ambiguity, missing decision points, and unconfirmed assumptions in the active
 feature specification, and record every resolution directly in the spec file.
 
-This covers two related gaps, treated the same way once found: an area the spec never addresses at
-all, and a decision the spec states as settled fact without the user ever having confirmed it.
-`/kaba:specify` pushes what it cannot settle to Open Questions, but a decision can still read as
-fact elsewhere in the spec — a requirement, a scenario, a success criterion — without anyone having
-actually confirmed it. Both kinds get surfaced, confirmed or corrected, and written back to the
-spec; neither is ever left looking settled while still materially unconfirmed.
+Scan consequential gaps, conflicting statements, and assumptions that have no support in the
+supplied requirements. Explicit supplied requirements are the contract; clarify their ambiguous
+meaning or genuine conflicts without reopening them for missing approval metadata. Integrate
+answers directly into current-state requirements and keep unanswered choices explicit.
 
 This pass is expected to run — and be completed — before moving on to `/kaba:acceptance-criteria`.
 If the user explicitly states they are skipping clarification (e.g., exploratory spike), you may
@@ -97,22 +95,12 @@ proceed, but must warn that downstream rework risk increases.
    - TODO markers / unresolved decisions
    - Ambiguous adjectives ("robust", "intuitive") lacking quantification
 
-   **Unconfirmed decisions cap the category they touch.** A decision is unconfirmed when it is
-   either (a) still sitting in `## Open Questions` — `/kaba:specify` puts there anything it could
-   not settle, so every entry there is by definition unconfirmed — or (b) stated as settled fact
-   somewhere else in the spec (a requirement, scenario, edge case, or success-criterion bullet)
-   without a trailing `(user-confirmed YYYY-MM-DD)` marker and without an existing
-   `## Clarifications` Q&A bullet already covering the same decision. An unconfirmed decision caps
-   the category it touches at **Partial** — never mark a category Clear on the strength of an
-   unconfirmed decision alone.
-
-   For each category with Partial or Missing status, add a candidate question opportunity unless:
-   - Clarification would not materially change implementation or validation strategy
-   - Information is better deferred to planning phase (note internally)
-
-   Every entry still in Open Questions is automatically a candidate, subject to these same
-   exclusion filters — a genuinely trivial one does not have to spend a question, but starts from a
-   presumption of materiality since the spec author flagged it as unresolved rather than guessed.
+   **Source fidelity**: Treat explicit supplied requirements as settled unless they conflict or
+   leave a consequential choice unresolved. A missing confirmation marker is not an ambiguity.
+   Preserve the source's specificity and limitations. Separate known Delivery Obligations from
+   unresolved questions; runtime configuration behavior, security, deadlines, and user-visible
+   setup remain behavioral requirements. Partial/Missing categories are prompts for inspection,
+   not permission to invent policy or require irrelevant functionality.
 
 4. Generate (internally) a prioritized queue of candidate clarification questions (maximum 5). Do
    NOT output them all at once. Apply these constraints:
@@ -147,18 +135,9 @@ proceed, but must warn that downstream rework risk increases.
        - Present your **recommended option prominently** at the top with clear reasoning (1-2
          sentences explaining why this is the best choice).
        - Format as: `**Recommended:** Option [X] - <reasoning>`
-       - When the question derives from a decision stated as fact **elsewhere in the spec** (a
-         requirement, scenario, edge case, or success-criterion bullet — never an Open Questions
-         entry, which by definition states no position) that lacks a `(user-confirmed YYYY-MM-DD)`
-         marker, format the recommendation instead as: `**Recommended:** Option [X] — current spec
-         states: <one-line restatement>. <1–2 sentences why it is reasonable>.` The remaining
-         options are the plausible alternative interpretations a different reasonable reader might
-         have expected. Never present such a question without a recommendation — the user must be
-         able to confirm with a single "yes".
-       - When the question derives from an entry still in Open Questions, there is no stated
-         position to restate — use the plain default format above
-         (`**Recommended:** Option [X] - <reasoning>`), recommending from best practices and
-         context like any other candidate question.
+       - If the spec states a position whose meaning is genuinely ambiguous, quote that
+         position and explain the consequential interpretations. Preserve supplied requirements
+         unless the human explicitly revises them.
        - Then render all options as a Markdown table:
 
        | Option | Description |
@@ -183,33 +162,20 @@ proceed, but must warn that downstream rework risk increases.
        - User signals completion ("done", "good", "no more"), OR
        - You reach 5 asked questions.
     - Never reveal future queued questions in advance.
-    - If no valid questions exist at start, **stop and ask before doing anything else**: the spec has
-      no open questions and no unconfirmed decisions left, so a re-run has nothing to clarify and
-      would only re-derive settled answers, rewriting `spec.md` in the process. Say that, and ask
-      whether to proceed anyway (e.g. the user knows of an ambiguity the scan did not surface). Ask,
-      then **end your turn** — do not answer yourself. Use `AskUserQuestion` if it is available.
-      Continue only on an explicit yes. This is clarify's own version of the prior-run gate the other
-      artifact-producing commands run as a script step; clarify deliberately does **not** gate on its
-      output existing, because re-running to resolve something still unclear is exactly what this
-      command is for.
+    - If source coverage is complete and no consequential questions remain, report zero questions,
+      give a compact coverage summary, and state that the spec is ready for `/kaba:acceptance-criteria`.
+      Leave `spec.md` unchanged; no invented question or redundant approval is needed.
+    - If no valid question can be asked but consequential unknowns remain (for example, the human
+      deferred them), preserve and report them explicitly. Let the human choose whether to resolve
+      them or proceed with the stated gaps; do not claim full coverage or invent answers.
 
 6. Integration after EACH accepted answer (incremental update approach):
     - Maintain in-memory representation of the spec (loaded once at start) plus the raw file contents.
-    - For the first integrated answer in this session:
-       - Ensure a `## Clarifications` section exists (create it just after the highest-level contextual/overview section per the spec template if missing).
-       - Under it, create (if not present) a `### Session YYYY-MM-DD` subheading for today.
-    - Append a bullet line immediately after acceptance: `- Q: <question> → A: <final answer>`.
-    - Then immediately apply the clarification:
-       - **If it resolves an entry in Open Questions**: remove that entry from Open Questions and
-         write the answer into the most appropriate section(s) below — this is how the Open
-         Questions list is worked toward empty.
-       - **If it confirms a decision already stated as fact elsewhere in the spec, as-is**: append
-         `(user-confirmed YYYY-MM-DD)` immediately after that bullet/requirement/scenario. No other
-         spec text changes.
-       - **If it overrides that decision**: rewrite the bullet/requirement/scenario in place to
-         state the chosen answer, with the `(user-confirmed YYYY-MM-DD)` marker, then update every
-         requirement, scenario, or section derived from the old decision per the mapping below —
-         leave no contradictory text behind.
+    - Apply each answer directly to the relevant current-state section:
+       - Remove the resolved Open Questions entry and state its answer in the appropriate section.
+       - Rewrite any contradictory or derived text so the spec has one consistent requirement.
+       - Known documentation/configuration example/CI/setup/completion tasks → Delivery Obligations,
+         with a stable DO-NNN ID, source reference, and completion check.
        - Functional ambiguity → Update or add a bullet in Functional Requirements.
        - User interaction / journey distinction → Update the relevant Acceptance Scenarios entry
          with the clarified actor, constraint, or step.
@@ -220,24 +186,23 @@ proceed, but must warn that downstream rework risk increases.
          vague adjective to metric or explicit target).
        - Edge case / negative flow → Add a new bullet under Edge Cases.
        - Scope boundary → Add or update the explicit exclusion in Out of Scope.
-       - Terminology conflict → Normalize term across spec; retain original only if necessary by adding `(formerly referred to as "X")` once.
+       - Terminology conflict → Normalize the canonical term across the spec while preserving source meaning.
     - If the clarification invalidates an earlier ambiguous statement, replace that statement instead of duplicating; leave no obsolete contradictory text.
     - Save the spec file AFTER each integration to minimize risk of context loss (atomic overwrite).
     - Preserve formatting: do not reorder unrelated sections; keep heading hierarchy intact.
     - Keep each inserted clarification minimal and testable (avoid narrative drift).
 
 7. Validation (performed after EACH write plus final pass):
-   - Clarifications session contains exactly one bullet per accepted answer (no duplicates).
+   - Every accepted answer is reflected in current requirements or Delivery Obligations; no answer log or dated confirmation markers are added.
    - Total asked (accepted) questions ≤ 5.
    - Updated sections contain no lingering vague placeholders the new answer was meant to resolve.
    - No contradictory earlier statement remains (scan for now-invalid alternative choices removed).
-   - Markdown structure valid; only allowed new headings: `## Clarifications`, `### Session YYYY-MM-DD`.
+   - Markdown structure and template sections remain valid.
    - Terminology consistency: same canonical term used across all updated sections.
-   - Every unconfirmed decision resolved this session now carries either a
-     `(user-confirmed YYYY-MM-DD)` marker at its original location, or has been removed from Open
-     Questions and integrated per step 6 — never left ambiguous.
+   - Supplied requirements and source references remain intact except for explicit revisions.
+   - Remaining consequential unknowns stay in Open Questions; known delivery tasks do not.
 
-8. Write the updated spec back to `FEATURE_SPEC`.
+8. Write the updated spec back to `FEATURE_SPEC` only if answers were integrated.
 
 Context for prioritization: $ARGUMENTS
 
@@ -247,10 +212,9 @@ Report completion (after questioning loop ends or early termination):
 - Number of questions asked & answered.
 - Path to updated spec.
 - Sections touched (list names).
-- `Assumptions: <N> confirmed, <M> overridden, <K> still unconfirmed` — listing the unconfirmed
-  ones (decisions that stayed in Open Questions or kept no `(user-confirmed YYYY-MM-DD)` marker
-  because the question quota was reached first).
-- Coverage summary table listing each taxonomy category with Status: Resolved (was Partial/Missing and addressed), Deferred (exceeds question quota or better suited for planning), Clear (already sufficient), Outstanding (still Partial/Missing but low impact). A category resting on an unconfirmed decision is never Clear — it appears as Deferred or Outstanding.
+- Remaining consequential questions and their effects on planning.
+- Compact coverage summary: Clear, Resolved, Deferred, or Outstanding, based on the actual
+  supplied contract and unanswered choices.
 - If any Outstanding or Deferred remain, recommend whether to proceed to `/kaba:acceptance-criteria` or run `/kaba:clarify` again later.
 - Suggested next command.
 
@@ -263,11 +227,10 @@ Report completion (after questioning loop ends or early termination):
 - Respect user early termination signals ("stop", "done", "proceed").
 - If no questions asked due to full coverage, output a compact coverage summary (all categories Clear) then suggest advancing.
 - If quota reached with unresolved high-impact categories remaining, explicitly flag them under Deferred with rationale.
-- **Every entry in Open Questions is unconfirmed by definition**, and so is any decision stated as
-  fact elsewhere in the spec without a `(user-confirmed YYYY-MM-DD)` marker or a matching
-  `## Clarifications` bullet — never mark either kind settled without one.
-- **Confirmed vs. overridden are different writes.** Confirming as-is only adds the marker;
-  overriding rewrites the statement and cascades to everything derived from it. Never blend the two.
+- **Preserve supplied requirements.** Ask about consequential ambiguity or conflict, not missing
+  approval provenance. Integrate answers as current-state prose without conversation history.
+- **Keep delivery distinct.** Known deliverables belong in Delivery Obligations with completion
+  checks; behavioral requirements remain testable and unresolved choices remain explicit.
 
 ## Next Step
 

@@ -44,18 +44,19 @@ When the collaboration tool is unavailable, continue here: Claude's native `cont
 already supplied the isolated context. An agent whose assigned task contains
 `KABA_ISOLATED_REVIEWER=1` is the fresh Codex reviewer and continues below without spawning again.
 
-**Scoped review mode**: If the arguments contain criterion IDs (tokens matching `[A-Z]+-\d+`,
-e.g. `DELETE-004 FMT-008`), enter scoped mode — only the listed criteria are reviewed. All other
-criteria are skipped. Cross-reference each ID against `ACCEPTANCE` to confirm it exists; warn and
-skip any invalid ID. If no valid IDs remain, fall back to full mode.
+**Scoped review mode**: If arguments contain criterion IDs (e.g. `DELETE-004 FMT-008`) or
+explicit source/Delivery Obligation references (e.g. `FR-005 DO-002`), review only those scopes
+and their affected evidence. Cross-reference IDs against criteria/spec and warn on invalid IDs;
+if no valid scope remains, fall back to full mode. Preserve all unrelated findings when merging.
 
 ## Goal
 
-Judge whether the test suite is **strong enough that making it green forces a correct
-implementation**. The central question for every test is: *could a trivial or deliberately-wrong
-implementation pass this?* `/kaba:implement-tests` already guarantees every criterion has *a*
-test block (mechanical 1:1 mapping); this command judges whether those blocks actually
-**constrain behavior**.
+Judge whether the tests and planned evidence constrain the approved behavior and expose
+plausible incorrect implementations. Separation and review are coverage safeguards, not a
+guarantee of correctness. The central question for every test is: *could a trivial or deliberately-wrong
+implementation pass this?* Inspect whether every sourced behavioral obligation, related outcome, and named variant has
+meaningful evidence. Mechanical snapshots protect identities and suite state; they do not
+guarantee criterion coverage or prove that green tests imply full delivery completion.
 
 This runs at the end of the test session (after `/kaba:implement-tests`), as the agent gate
 before human review and Phase 3 implementation.
@@ -70,11 +71,15 @@ never write implementation code, never run the test suite or write a reference i
 `rules_files`) are non-negotiable. A violation of a MUST-level project rule in a test is
 automatically CRITICAL.
 
-**Review tests against existing criteria only**: Do NOT re-derive acceptance criteria from the
-spec, do NOT re-scan for banned patterns, and do NOT flag brittleness/over-specification — those
-are owned by other steps (`/kaba:acceptance-criteria`, the
-`implement-tests` inline scan) and are out of scope here. Load `spec.md` only for the domain
-understanding needed to judge fidelity.
+**Review the approved contract without inventing requirements**: Compare the spec, criteria,
+and evidence plan. Report sourced obligations missing upstream from criteria, missing required
+variants/evidence, and needless implementation coupling that rejects legitimate conforming
+implementations. At this test-stage checkpoint, check Delivery Obligation mapping and planned
+verification, not completed deliverables or implementation-dependent manual checks. Those are
+verified during implementation completion; their pending status is not a test handoff blocker.
+Keep Delivery Obligations distinct from runtime evidence. Do not rewrite
+requirements, edit criteria/plans/tests, choose unresolved policy, or repeat the banned-pattern
+scan. An upstream gap is a finding with its source and consequence, not a new requirement.
 
 ## Execution Steps
 
@@ -95,9 +100,9 @@ If `ACCEPTANCE` or `TEST_PLAN` is missing, ERROR and stop — suggest running
 
 ### 2. Load context
 
-- **REQUIRED**: Read `ACCEPTANCE` — the behavioral contract (each criterion's ID and assertion).
-- **REQUIRED**: Read `TEST_PLAN` — the criterion → file → describe-block mapping.
-- Read `SPEC` for domain understanding (used only to judge fidelity).
+- **REQUIRED**: Read `ACCEPTANCE` — the behavioral contract (IDs, behavior, related outcomes, required variants, evidence kinds).
+- **REQUIRED**: Read `TEST_PLAN` — the criterion → required outcomes/variants → evidence-location mapping.
+- Read `SPEC` for source fidelity, missing behavioral obligations, and separate Delivery Obligations.
 - Read `CLAUDE.md` for project test conventions.
 - Read the project rules (CLAUDE.md/AGENTS.md, per `.kaba/config.yml`'s `rules_files`) for
   project-wide constraints.
@@ -105,17 +110,20 @@ If `ACCEPTANCE` or `TEST_PLAN` is missing, ERROR and stop — suggest running
 
 ### 3. Build the review map
 
-From `TEST_PLAN`, list every criterion ID and the test file + describe block it maps to. **In
-scoped mode, only map the criteria matching the provided IDs.** Read the actual test files and
+From `TEST_PLAN`, list every criterion ID, its related outcomes/named variants, and all
+evidence locations it maps to. **In
+scoped mode, map the selected criteria/source obligations and their affected evidence.** Read the actual test files and
 locate each criterion's test — tests carry `# CRITERION-ID` (RSpec) or `// CRITERION-ID` (Go) at each
 criterion-bearing example/function/subtest/table row, use it to match. Build, in memory, a table of
-`criterion → assertion (from criteria) → located test (file:line, code)`.
+`criterion → required outcomes/variants → evidence (file:line/code or check procedure/result)`.
+Inspect actual assertions and setup, not names or markers alone. In full mode, also trace spec
+obligations to criteria and Delivery Obligations to their separate completion checks. In scoped
+mode, inspect source dependencies of the selected criteria; leave unrelated findings untouched.
 
 ### 4. Core detection passes
 
 For each criterion/test **in the review map** (all criteria in full mode; only the scoped criteria
-in scoped mode), run the three core checks. These are the ONLY checks (see Operating Constraints
-for what is out of scope).
+in scoped mode), run the checks below against sourced requirements; report gaps instead of inventing policy.
 
 **A. Assertion strength / gameability** — Reason statically about the weakest implementation that
 would satisfy the assertion. Flag a test when a trivial or deliberately-wrong impl would pass it,
@@ -132,7 +140,17 @@ domain is present.)
 
 **C. Coverage depth** — Is the mapped block present and meaningful? Flag missing, empty, pending
 (`skip`/`xit`/`pending`), or trivially-true blocks. Also surface any criterion ID in the plan
-with no locatable test — a hole `implement-tests` should have caught.
+with no evidence for required outcomes/variants. Manual/source/command evidence must have a
+concrete location/procedure and expected result; it need not be a test block. Identify checks
+that reasonably await implementation as pending, not falsely completed. Supported PIN/passed
+and conforming MODIFY/passed are valid; required REMOVE-marked legacy tests may stay pending.
+
+**D. Source completeness and coupling** — Flag a sourced behavior missing from criteria as an
+upstream gap with the spec location and a concrete consequence. Flag unnecessary coupling only
+with a plausible implementation that satisfies the approved behavior but the test rejects,
+explaining the accidental structural constraint. Relevant side effects, ordering, concurrency,
+and connected recovery journeys matter only when required by the source. Missing planned delivery
+completion checks remain separate findings, not demands for completed deliverables or fake tests.
 
 ### 5. Hybrid escalation — prove every weakness with a stub
 
@@ -140,31 +158,44 @@ For every test flagged in pass A or B, construct the **weakest concrete implemen
 the report only — never written to a file) that makes that test pass. The stub is both the proof
 and the false-positive filter:
 - If you can write a stub that passes the cited test, the finding stands; include the stub.
-- **If you cannot write such a stub, the finding is a false positive — drop it.**
+- **If you cannot show a plausible incorrect implementation that passes the cited evidence,
+  drop an assertion-weakness claim.** A localized missing-obligation/evidence gap instead cites
+  its source, absent mapping, and concrete incorrect behavior that would escape detection.
+  A coupling finding cites a conforming implementation rejected by the unnecessary assertion.
+  A project-rule or delivery-check finding cites the exact rule/task and observed mismatch;
+  it does not require an invented passing stub.
 
 Strong tests (those that survive — no trivial stub passes them) get no finding.
 
 ### 6. Severity assignment
 
-- **CRITICAL** — a criterion a trivial/wrong impl provably passes (stub shown); a criterion with
-  no real assertion; a violation of a MUST-level project rule in a test.
-- **HIGH** — assertion materially weaker than the criterion; a missing side-effect/negative
-  assertion that lets a broad class of wrong impls pass.
+Assess mixed evidence per required outcome and named variant, using its planned evidence kind.
+A source/command/manual check is valid with a suitable procedure and expected result; a check
+that requires implementation may remain explicitly pending at the test handoff. Neither absence
+of an automated assertion for that check nor its legitimate pending status is a finding.
+
+- **CRITICAL** — a planned automated outcome a trivial/wrong implementation provably passes
+  (stub shown), or with no real assertion; a violation of a MUST-level project rule in a test.
+- **HIGH** — assertion materially weaker than the criterion; a sourced required outcome or
+  variant without planned evidence (including a missing/invalid procedure or expected result
+  for non-automated evidence); unnecessary coupling that blocks valid implementations; missing
+  side-effect/negative evidence that lets a broad class of wrong implementations pass.
 - **MEDIUM** — partial fidelity; low-risk boundary one-sidedness.
 - **LOW** — cosmetic / readability that does not affect what the test constrains.
 
 ### 7. Write the report
 
 Write the findings to `FEATURE_DIR/test-review.md` — the ONLY file this command writes — using the
-Report Format below. Use stable, deterministic finding IDs (prefix `R`, numbered in criterion
-order) so re-running without changes yields consistent IDs and counts.
+Report Format below. Use stable, deterministic finding IDs (prefix `R`, numbered in source/criterion order).
+Preserve existing IDs for the same issues during scoped merges; assign new findings unused IDs
+so unrelated findings never collide or get renumbered.
 
 **In scoped mode** — merge into the existing report instead of overwriting:
 
 1. If `FEATURE_DIR/test-review.md` exists, read it and parse the Findings table.
-2. For each scoped criterion that **cleared** (no finding): remove its row from the Findings table.
-3. For each scoped criterion that **still has a finding**: replace its row with the updated finding.
-4. Rows for criteria **not in the scoped set**: leave untouched.
+2. For each scoped criterion/source obligation that **cleared** (no finding): remove its rows from the Findings table.
+3. For each scoped criterion/source obligation that **still has findings**: replace its rows with updated findings, preserving stable IDs for the same issues.
+4. Rows for criteria/source obligations **not in the scoped set**: leave untouched.
 5. Recompute Summary counts and Verdict from the remaining rows.
 6. Recompute Next Actions from remaining findings.
 7. **Leave Strength Summary as-is** — a scoped review cannot regenerate full-suite prose.
@@ -197,11 +228,13 @@ Print a short summary to the conversation (counts + verdict + report path) and s
 
 ## Findings
 
-| ID | Criterion | Location (file:block) | Severity | Weakness | Passing stub | Recommendation |
+| ID | Criterion | Location (file:block) | Severity | Weakness | Counterexample / evidence | Recommendation |
 |----|-----------|-----------------------|----------|----------|--------------|----------------|
 | R1 | CREATE-010 | create_spec.rb > invalid url | HIGH | Asserts only status 422; does not pin which input was rejected | `def create; head :unprocessable_entity; end` | Assert the error points at the offending field (e.g. `/data/attributes/url`) |
 
-(One row per finding. Keep the stub to the minimum that passes the cited test.)
+(One row per finding. Use a minimal plausible passing incorrect implementation for assertion
+weakness, source/absence evidence for upstream gaps, or a rejected conforming implementation
+for coupling. Identify upstream gaps by their existing source reference instead of inventing IDs.)
 
 ## Strength Summary
 
@@ -217,10 +250,12 @@ Print a short summary to the conversation (counts + verdict + report path) and s
 ## Key Rules
 
 1. **Read-only except `test-review.md`.** Never modify test-owned paths (the configured permission classifier), never write implementation code, never run the suite.
-2. **Every weakness finding MUST carry a concrete passing stub.** No stub ⇒ drop the finding.
-   This is the false-positive filter.
-3. **Core checks only.** Assertion strength, criterion↔test fidelity, coverage depth. Do NOT
-   re-derive criteria, re-scan banned patterns, or flag brittleness — those belong to other steps.
+2. **Prove findings concretely.** Assertion weakness requires a plausible passing incorrect
+   implementation; upstream gaps require source + absent evidence + consequence; coupling
+   requires a rejected conforming implementation. Keep delivery-check gaps distinct.
+3. **Review source fidelity and evidence.** Include missing obligations/criteria/variants and
+   needless implementation coupling; report upstream gaps without changing the contract.
+   Do not invent policy or repeat the banned-pattern scan.
 4. **Project rules violations are CRITICAL.**
 5. **Advisory, not blocking.** The human review step makes the final go/no-go call.
 6. **Deterministic.** Stable finding IDs and consistent counts when re-run without changes.

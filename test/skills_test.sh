@@ -164,10 +164,10 @@ gs="$(line_of "$S/specify/SKILL.md" 'check-artifacts\.sh')"
 ns="$(line_of "$S/specify/SKILL.md" 'kaba\.scriptdir)/new-feature\.sh')"
 assert_ok "specify gates before new-feature.sh" test "$gs" -lt "$ns"
 
-# clarify's exception: it must NOT gate on its output existing, only on a settled spec.
+# clarify has no artifact overwrite gate; complete source coverage reports readiness directly.
 assert_fail "clarify does not call check-artifacts.sh" 1 grep -q 'check-artifacts\.sh' "$S/clarify/SKILL.md"
-assert_ok   "clarify gates on a settled spec instead"  grep -qi 'no open questions and no unconfirmed decisions' "$S/clarify/SKILL.md"
-assert_ok   "clarify ends the turn after asking"       grep -qi 'end your turn' "$S/clarify/SKILL.md"
+assert_fail "clarify has no redundant settled-spec approval" 1 grep -qi 'stop and ask before doing anything else' "$S/clarify/SKILL.md"
+assert_ok   "clarify reports readiness for complete coverage" grep -q 'ready for `/kaba:acceptance-criteria`' "$S/clarify/SKILL.md"
 
 # Allowlist schema v3: the three pipeline skills and the template speak it.
 SK="$SCRIPT_DIR/../skills"

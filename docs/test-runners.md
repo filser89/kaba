@@ -57,7 +57,11 @@ and files excluded by the selected build tags do not contribute.
 
 Place `// CRITERION-ID` beside each function, literal registration, or table row that
 covers that criterion. The marker guides review/fixes; scripts use AST identities.
-Every criterion must map to a real assertion and remain locatable in source.
+Every automated behavioral outcome and named variant must map to real assertions and remain
+locatable in source. Several criteria may share a coherent case; one criterion may require
+several cases/evidence locations. Mark all covered IDs. Source/configuration inspection, command
+verification, and manual runtime checks use explicit procedures/results outside the test-source
+marker contract. Keep Delivery Obligations separate; do not manufacture tests for deliverables.
 
 Mark a function or literal subtest removal with `t.Skip("REMOVED by <feature>")`.
 For a table, give the affected row a `removedBy` string and use

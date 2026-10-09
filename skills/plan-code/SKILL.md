@@ -23,7 +23,8 @@ This command takes the **locked test suite** (the contract) and the **spec** (th
 
 This is a **planning step**, not a writing step. No implementation code is produced — not models, controllers, services, migrations, or method bodies. The output is `code-plan.md`, which `/kaba:implement-code` will follow.
 
-**This command has exactly one goal:** produce a plan that, when followed, turns the locked test suite green — structured consistently with the existing architecture (`architecture.md`) and the project's rules. It owns implementation and library decisions, but it does not make every such decision blindly: when a decision is **not safely defaultable**, it stops and asks the human — see **Resolution Chain & Escalation** below.
+**This command has one goal:** plan complete delivery of the approved feature, including the
+locked behavioral tests, non-automated runtime evidence, and Delivery Obligations — structured consistently with the existing architecture (`architecture.md`) and the project's rules. It owns implementation and library decisions, but it does not make every such decision blindly: when a decision is **not safely defaultable**, it stops and asks the human — see **Resolution Chain & Escalation** below.
 
 ## Outline
 
@@ -38,7 +39,11 @@ This is a **planning step**, not a writing step. No implementation code is produ
 2. **Load context and template**:
    - Read `.kaba/architecture.md` — the existing patterns: the consistency reference and the resolution-chain source for "is this fact already established?". If absent or a bare greenfield skeleton, note that.
    - Read the project rules (CLAUDE.md/AGENTS.md, per `.kaba/config.yml`'s `rules_files`) — the rules the plan must obey (e.g. size limits, layering rules, naming and response-format conventions).
-   - Do **NOT** read `acceptance-criteria.md` or `test-plan.md` — they are scaffolding absorbed into the locked tests.
+   - Read `acceptance-criteria.md` and `test-plan.md` as approved behavioral/evidence contracts,
+     including non-automated runtime checks. Read Delivery Obligations from `spec.md`. Do not
+     import the test-author conversation or its justifications; use approved artifacts and the
+     isolated review handoff. Missing criteria/evidence or unresolved behavior require upstream
+     clarification/review, never implementation guesses or weakened tests.
    - Load `$(git config kaba.scriptdir)/../templates/code-plan-template.md` — the output structure.
 
 3. **Survey the test suite and existing code**:
@@ -51,7 +56,11 @@ This is a **planning step**, not a writing step. No implementation code is produ
 
 6. **Make decisions**: For each test-invisible choice, apply the **Decision-Quality Procedure**. Before committing a choice, apply the **stop test** in **Resolution Chain & Escalation**. If a decision is not safely defaultable, STOP and escalate immediately.
 
-7. **Determine build order**: A dependency-ordered sequence of the components — the task list for `implement-code`.
+7. **Determine build order and completion work**: A dependency-ordered sequence of components
+   and the required delivery work. Add a Delivery Obligations table preserving each DO-NNN,
+   source, deliverable, target path, and completion check. Add a Runtime Evidence section for
+   non-automated behavioral outcomes/variants, exact check procedures/expected results, and
+   pending implementation-dependent verification. No green-test claim substitutes for these.
 
 8. **Self-validate the plan**: Run every check in the **Validation Checklist**. Fix the plan before writing if any check fails. Do NOT silently skip failures.
 
@@ -137,7 +146,9 @@ Before writing the plan document, verify ALL of the following. If any check fail
 5. **No escalation left silent**: Any not-safely-defaultable decision is escalated, not guessed. If escalating, the only output is the escalation block.
 6. **Rules respected**: The planned components respect the project rules (layering rules, size limits, and any other declared constraints are feasible).
 7. **No implementation code**: The plan contains structure (names, responsibilities, schema) — no method bodies or logic.
-8. **Build order complete**: Every component appears in the Build Order, dependency-ordered.
+8. **Build order complete**: Every component and delivery task appears in the Build Order, dependency-ordered.
+9. **Delivery/evidence complete**: Every spec Delivery Obligation and non-automated behavioral
+   outcome/variant is mapped to a target/check; unresolved expected behavior is escalated.
 
 ## Report Format
 
@@ -152,6 +163,8 @@ Otherwise the report MUST include:
 - Decisions: [N] flagged
 - Architectural delta: [new patterns/layers/deps, or "none — reuses existing patterns"]
 - Test files covered: [N] / [N] (MUST be equal — if not, ERROR)
+- Delivery Obligations mapped: [N] / [N]
+- Non-automated runtime checks planned: [N] / [N]
 
 ## Validation
 - [ ] Test coverage: [PASS/FAIL]
@@ -162,15 +175,20 @@ Otherwise the report MUST include:
 - [ ] Rules respected: [PASS/FAIL]
 - [ ] No implementation code: [PASS/FAIL]
 - [ ] Build order complete: [PASS/FAIL]
+- [ ] Delivery/evidence complete: [PASS/FAIL]
 ```
 
 If ANY validation check is FAIL, do NOT proceed. Fix the plan and re-validate.
 
 ## Key Rules
 
-- **One goal: turn the locked tests green, consistently.** Plan only the production code + decisions needed for that. Do not re-decide anything the tests already pin.
+- **Plan full delivery.** Green the locked tests consistently, preserve the approved behavior,
+  complete Delivery Obligations, and establish non-automated runtime evidence. Do not re-decide
+  pinned behavior or assume all non-test work is encoded in green tests.
 - **No implementation code.** Not models, controllers, services, migrations, or method bodies. Structure and decisions only.
-- **The tests are the contract; the spec is the intent.** Tests say what must hold; the spec says why, which grounds the flagged decisions.
+- **Approved artifacts define the contract.** Locked tests establish automated evidence; the
+  spec and criteria define required behavior, and the evidence plan and Delivery Obligations
+  preserve work outside those tests. Test-author conversation is outside this session.
 - **Own implementation decisions; escalate the unsafe ones.** Decide freely when a choice is safely defaultable; STOP and escalate when it is pattern-setting or externally-committing. See **Resolution Chain & Escalation**.
 - **Apply declared patterns, don't escalate them.** A new layer that follows a project-rules-declared convention is applied, not escalated. Escalation is for new + undeclared + unsafe decisions only.
 - **Ground every decision.** Investigate determinable facts; never guess what is knowable. The same investigation surfaces what must be escalated.

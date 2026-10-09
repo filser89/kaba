@@ -61,27 +61,39 @@ down to empty next.
    must have and their order.
 
 5. **Author mode — fill the template from the one-liner and the conversation with the user**:
-   - Fill Summary, Acceptance Scenarios, Edge Cases, Functional Requirements, Success Criteria, and
-     Out of Scope only with what the user actually stated or confirmed when asked.
-   - Anything a section needs but the user did not state goes under Open Questions instead — never
-     invent a requirement, a scenario, an edge case, or a success criterion to fill a gap.
+   - Fill the template sections, including Delivery Obligations and Supporting Context, only with what the user actually stated or confirmed when asked.
+   - Consequential choices the user did not settle go under Open Questions. Mark inapplicable or
+     empty sections explicitly rather than treating every empty template slot as a question.
+     Never invent requirements, scenarios, edge cases, delivery tasks, or success criteria.
 
 6. **Import mode — map the source document onto the template's sections**:
    - Read the source document in full. For each template section, carry across the matching
      content (e.g. a requirements list → Functional Requirements; usage examples or Given/When/Then
      walkthroughs → Acceptance Scenarios; stated limits or explicit non-goals → Out of Scope).
-   - Anything in the source that has no home in a template section (metadata, rationale, side notes)
-     is preserved under Open Questions rather than dropped.
-   - Anything a template section needs but the source document does not cover goes under Open
-     Questions too, same as author mode — do not invent to fill the gap.
+   - Preserve known documentation, configuration examples, CI/setup verification, and completion
+     tasks under Delivery Obligations with DO-NNN IDs, sources, and completion checks. Preserve
+     relevant metadata, rationale, and side notes under Supporting Context. Only unresolved
+     choices go under Open Questions. Runtime configuration behavior, security guarantees,
+     deadlines, and real user-visible setup behavior remain in the behavioral sections.
+   - Unresolved consequential choices stay under Open Questions. Mark empty/inapplicable sections
+     explicitly; do not manufacture questions or requirements merely to fill the template.
 
 7. **Write** the filled template to `FEATURE_SPEC`: `[name]` from the one-liner or the source
-   document's title, `[NNN-slug]` set to `BRANCH`, `[date]` to today, `Status` left as `draft`.
+   document's title, `[NNN-slug]` set to `BRANCH`, `Status` left as `draft`. Before reporting, compare every supplied
+   requirement, scenario, limitation, delivery task, and open question to its destination; preserve
+   its meaning and specificity, and fix omissions or contradictions without inventing answers.
 
 8. **Report**: the created branch, the feature directory, and the spec path. Then point the user at
    `/kaba:clarify` as the next step.
 
 ## Key Rules
+
+- **Classify the obligation itself, not its heading or security label.** Split mixed supplied
+  clauses by obligation while preserving their source and meaning: documentation, example/config
+  packaging, tracked placeholders, ignored `.env` files, and version-control hygiene checks are
+  Delivery Obligations, even inside a functional/security requirement. Runtime secret disclosure
+  and security guarantees remain behavioral requirements. Preserve every clause without adding
+  behavior.
 
 - **Two modes, one flag.** Default is author-from-one-liner; `--spec <path>` switches to import.
   No other parameter threads through this command.
@@ -92,5 +104,6 @@ down to empty next.
 - **Never invent.** Every requirement, scenario, edge case, and success criterion must trace to
   something the user said or the imported document stated. Unknowns go to Open Questions — closing
   that list is exactly what `/kaba:clarify` exists to do.
-- **Nothing from an imported document is discarded.** If it has no home in the template's sections,
-  it goes to Open Questions, not the cutting-room floor.
+- **Nothing from an imported document is discarded.** Use Supporting Context for relevant facts without another home, Delivery Obligations for known
+  deliverables, and Open Questions for unresolved choices. Preserve source references and any
+  existing stable IDs; do not turn deliverables into invented behavioral tests.
